@@ -1,0 +1,17 @@
+{
+  "name": "user-kit",
+  "owner": {
+    "name": "Nathaniel Tucker",
+    "email": "me@ntucker.me"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace for personal Cursor skills and subagents."
+  },
+  "plugins": [
+    {
+      "name": "user-kit",
+      "source": ".",
+      "description": "Personal Cursor skills and subagents."
+    }
+  ]
+}
