@@ -1,16 +1,12 @@
 # user-kit
 
-Personal Cursor skills and subagents, packaged as a Cursor plugin so desktop, Cloud Agents, Grok-started workers, and Projects can load the same kit.
+Personal Cursor skills and subagents. This repository is the **origin source of truth**. Desktop authoring is the clone at `~/.cursor/plugins/local/user-kit`. `cursor-skills-sync` commits and pushes that checkout here.
 
 This repository is public. Do not put secrets in skills.
 
-## Install
+**Do not install this repo from the Cursor marketplace.** A personal GitHub import pins the first-import SHA and, with the same plugin name `user-kit`, overrides the local checkout and freezes that desktop. Cloud Agents, Grok, and Projects get a dated snapshot (`user-kit-YYYY-MM-DD`) via `/cut-cloud` in the sync engine.
 
-Customize → Plugins → Add → From GitHub Repository → `https://github.com/ntucker/user-kit`
-
-Install **user-kit** at **user** scope, then reload the window.
-
-Authoring checkout (this machine): `~/.cursor/plugins/local/user-kit`. Edits here are committed and pushed by `cursor-skills-sync`. Cloud and other clients follow the published git SHA; personal GitHub imports often stay pinned until you remove and re-add the marketplace.
+Goals: [`GOALS.md`](GOALS.md). Engine (hooks, `/cut-cloud`): `~/.cursor/plugins/local/cursor-skills-sync/GOALS.md`.
 
 ## Layout
 
