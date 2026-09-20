@@ -15,7 +15,7 @@ This is ordinary API design (Bloch's "easy to use correctly, hard to use incorre
 
 ## Three properties of the consumer
 
-Everything below derives from these. Sources, scope caveats, and local measurement methods are in [evidence.md](evidence.md).
+Everything below derives from these. Read [Evidence ledger](references/evidence.md) when a claim below matters for a decision or you need to measure locally; it has sources, scope caveats, and the measurement protocol.
 
 1. **The prior is frequency-shaped, version-blended, and unpatchable.** A model knows a pattern in proportion to how often it appeared in training; accuracy rises log-linearly with corpus frequency. Every version of a library that ever appeared is superimposed into one distribution, which is why models emit deprecated APIs 25 to 38% of the time and score around 50% on version-pinned tasks. Nothing a library ships can edit this. It can only be matched or overridden.
 
@@ -65,7 +65,7 @@ Two coherent philosophies exist; shadcn is the clearest statement of the first.
 - **Legibility.** Ship source into the repo. The agent reads and edits it, and styling is visible where it is written. Correct when the agent **owns** the components: it will open the file, and readable implementation (colocated styling, minimal indirection) is what it needs.
 - **Contract.** Expose a typed API and hide the implementation. Correct when the agent **consumes** the components from app code: it sees imports, types, and a few sibling usages, and rarely opens the implementation. Readable styling is writable styling, and call-site styling is the entropy Move 3 removes.
 
-Most systems need both, split by audience: legibility for whoever maintains `components/`, contract for everyone importing from it. Decide which regime a file is in before applying the moves. [shadcn-case-study.md](shadcn-case-study.md) works through what to keep from shadcn, what to change, and why.
+Most systems need both, split by audience: legibility for whoever maintains `components/`, contract for everyone importing from it. Decide which regime a file is in before applying the moves. Read [shadcn case study](references/shadcn-case-study.md) when the system is built on or compared against shadcn; it works through what to keep, what to change, and why.
 
 ## Tensions
 

@@ -68,7 +68,7 @@ Tabs that keep state and pre-render the inactive one:
 </Suspense>
 ```
 
-Prepare content the user will probably open next: `<Activity mode="hidden"><CheckoutStep2 /></Activity>` (renders, loads code and Suspense data in the background). Hydration units without changing the initial UI: `<Activity><Comments /></Activity>` under the main post. Router keep-alive: render the previous route's element in a hidden `<Activity>` so Back is instant. Media inside Activity: pause in a cleanup Effect. Full detail and troubleshooting: [activity.md](activity.md).
+Prepare content the user will probably open next: `<Activity mode="hidden"><CheckoutStep2 /></Activity>` (renders, loads code and Suspense data in the background). Hydration units without changing the initial UI: `<Activity><Comments /></Activity>` under the main post. Router keep-alive: render the previous route's element in a hidden `<Activity>` so Back is instant. Media inside Activity: pause in a cleanup Effect. Full detail and troubleshooting: [Activity reference](references/activity.md).
 
 ## `useEffectEvent`
 
@@ -114,7 +114,7 @@ const logVisit = useEffectEvent(() => analytics.page(url, { userId: user?.id, pl
 useEffect(() => { logVisit(); }, [url]);
 ```
 
-Migration recipes from latest-ref/`useEvent` polyfills and lint-error meanings: [effect-events.md](effect-events.md).
+Migration recipes from latest-ref/`useEvent` polyfills and lint-error meanings: [Effect Events reference](references/effect-events.md).
 
 ## `cacheSignal` (Server Components)
 
@@ -184,7 +184,7 @@ Rules:
 - Abort with a sentinel (`class Postponed extends Error {}`) and filter it in `onError` so intentional postponement is not logged as a failure.
 - Hydrate the whole document with `hydrateRoot(document, <App />)` as usual.
 
-End-to-end flow, storage, timeouts, and troubleshooting: [partial-prerendering.md](partial-prerendering.md).
+End-to-end flow, storage, timeouts, and troubleshooting: [Partial pre-rendering reference](references/partial-prerendering.md).
 
 ## Other 19.2 behavior to rely on
 
@@ -218,7 +218,7 @@ End-to-end flow, storage, timeouts, and troubleshooting: [partial-prerendering.m
 
 ## References
 
-- [activity.md](activity.md): lifecycle table, SSR/hydration behavior, pre-render mechanics, patterns (tabs, routers, master-detail, wizards, modals, media), memory guidance, troubleshooting.
-- [effect-events.md](effect-events.md): reactive vs non-reactive decision, migration recipes, custom Hook patterns, every lint/runtime error and its fix.
-- [partial-prerendering.md](partial-prerendering.md): full API matrix (Web and Node streams), storage/serving flow, abort sentinel, Suspense placement, caveats.
+- [Activity reference](references/activity.md): lifecycle table, SSR/hydration behavior, pre-render mechanics, patterns (tabs, routers, master-detail, wizards, modals, media), memory guidance, troubleshooting.
+- [Effect Events reference](references/effect-events.md): reactive vs non-reactive decision, migration recipes, custom Hook patterns, every lint/runtime error and its fix.
+- [Partial pre-rendering reference](references/partial-prerendering.md): full API matrix (Web and Node streams), storage/serving flow, abort sentinel, Suspense placement, caveats.
 - Upstream: [React 19.2 post](https://react.dev/blog/2025/10/01/react-19-2), [`<Activity>`](https://react.dev/reference/react/Activity), [`useEffectEvent`](https://react.dev/reference/react/useEffectEvent), [`cacheSignal`](https://react.dev/reference/react/cacheSignal), [Performance Tracks](https://react.dev/reference/dev-tools/react-performance-tracks), [`prerender`](https://react.dev/reference/react-dom/static/prerender), [`resume`](https://react.dev/reference/react-dom/server/resume), [`eslint-plugin-react-hooks`](https://react.dev/reference/eslint-plugin-react-hooks).

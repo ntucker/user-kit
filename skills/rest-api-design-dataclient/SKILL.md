@@ -252,8 +252,7 @@ GET /posts → { "posts": [...], "cursor": "..." }
 | PATCH | Full updated entity | Not just changed fields |
 | DELETE | `{ id }` or 204 | Minimal response OK |
 
-## Additional Resources
+## References
 
-For detailed patterns and examples:
-- [Response bundling patterns](BUNDLING.md)
-- [Client schema examples](CLIENT-SCHEMAS.md)
+- Read [Response bundling patterns](references/bundling.md) when deciding what one endpoint should return together (nested entities, side effects, list + detail).
+- Read [Client schema examples](references/client-schemas.md) when writing the Data Client `Entity`/`schema` definitions that consume an endpoint.

@@ -1,7 +1,7 @@
 {
   "name": "user-kit",
   "version": "1.0.0",
-  "description": "Personal Cursor skills and subagents (advisor workflow, React, REST API design, skill authoring).",
+  "description": "Personal Cursor skills and subagents (advisor workflow, human-first planning, React, REST API design, skill authoring).",
   "author": {
     "name": "Nathaniel Tucker",
     "email": "me@ntucker.me"

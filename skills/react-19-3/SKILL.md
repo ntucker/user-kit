@@ -163,7 +163,7 @@ JavaScript-driven (Web Animations API), with type-aware timing:
 }}>
 ```
 
-Details (how React sequences the VT, batching of overlapping transitions, router integration, troubleshooting): [view-transitions.md](view-transitions.md).
+Details (how React sequences the VT, batching of overlapping transitions, router integration, troubleshooting): [View Transitions reference](references/view-transitions.md).
 
 ## Fragment refs
 
@@ -203,7 +203,7 @@ function InView({ onChange, children }) {
 }
 ```
 
-Reach for it whenever the alternative is a wrapper element that would disturb layout/styling (flex/grid children, table rows, list items), or modifying a component you do not own to forward a ref. Full API, shared-observer and focus patterns: [fragment-refs.md](fragment-refs.md).
+Reach for it whenever the alternative is a wrapper element that would disturb layout/styling (flex/grid children, table rows, list items), or modifying a component you do not own to forward a ref. Full API, shared-observer and focus patterns: [Fragment refs reference](references/fragment-refs.md).
 
 ## `browser()` for browser-only rendering
 
@@ -240,7 +240,7 @@ function useBrowserQuery(query, options) {
 }
 ```
 
-Server-side timeout that hands the rest to the browser without logging errors: `abort(browser('server render timed out'))` on the stream from `renderToPipeableStream` / `renderToReadableStream` (or pass `browser()` as the `AbortController` reason). Full detail and migration table: [browser-ssr.md](browser-ssr.md).
+Server-side timeout that hands the rest to the browser without logging errors: `abort(browser('server render timed out'))` on the stream from `renderToPipeableStream` / `renderToReadableStream` (or pass `browser()` as the `AbortController` reason). Full detail and migration table: [Browser-only SSR reference](references/browser-ssr.md).
 
 ## Trusted Types
 
@@ -301,7 +301,7 @@ Delete pass-through `*Provider` components that existed only for this. The `valu
 
 ## References
 
-- [view-transitions.md](view-transitions.md): sequencing, batching, Suspense placement variants, router notes, troubleshooting.
-- [fragment-refs.md](fragment-refs.md): every `FragmentInstance` method with signatures, shared-observer and focus patterns.
-- [browser-ssr.md](browser-ssr.md): `browser()` reference, `onBrowserBailout`, abort, migration recipes.
+- [View Transitions reference](references/view-transitions.md): sequencing, batching, Suspense placement variants, router notes, troubleshooting.
+- [Fragment refs reference](references/fragment-refs.md): every `FragmentInstance` method with signatures, shared-observer and focus patterns.
+- [Browser-only SSR reference](references/browser-ssr.md): `browser()` reference, `onBrowserBailout`, abort, migration recipes.
 - Upstream: [React 19.3 post](https://react.dev/blog/2026/09/09/react-19-3), [`<ViewTransition>`](https://react.dev/reference/react/ViewTransition), [`addTransitionType`](https://react.dev/reference/react/addTransitionType), [`<Fragment>`](https://react.dev/reference/react/Fragment), [`browser`](https://react.dev/reference/react-dom/browser), [`<Suspense>`](https://react.dev/reference/react/Suspense).
