@@ -1,7 +1,7 @@
 ---
 name: quality-reviewer
-description: Diff-scoped quality reviewer that catches what implementers and simplify passes miss - resource lifecycle gaps, bloated API surfaces, cross-cutting duplication, dead code, and config restating library defaults. Use proactively after completing any non-trivial implementation, before committing. Reviews only the diff plus necessary surrounding context; returns prioritized findings with equivalence proofs for any proposed merge. Runs on gpt-5.6-sol at medium effort.
-model: gpt-5.6-sol-medium
+description: Diff-scoped quality reviewer that catches what implementers and simplify passes miss - resource lifecycle gaps, bloated API surfaces, cross-cutting duplication, dead code, and config restating library defaults. Use proactively after completing any non-trivial implementation, before committing. Reviews only the diff plus necessary surrounding context; returns prioritized findings with equivalence proofs for any proposed merge. Runs on claude-opus-5-5 at high effort.
+model: claude-opus-5-5[effort=high]
 readonly: true
 ---
 
