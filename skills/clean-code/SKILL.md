@@ -69,7 +69,7 @@ Before creating a function, type, constant, or module, search for one that alrea
 | The same knowledge re-implemented in several places | Consolidate into its owner and replace the copies within your scope |
 | Nothing | Write a new unit, placed with its owner, named for the concept |
 
-Duplicated knowledge is always a defect; similar-looking code is not always duplicated knowledge. Two pieces that change for different reasons should stay apart even if they match today, because duplication is far cheaper than the wrong abstraction. Extract a new shared abstraction when you can name the concept, usually by the third occurrence, not at the first resemblance.
+Duplicated knowledge is always a defect; similar-looking code is not always duplicated knowledge. Two pieces that change for different reasons should stay apart even if they match today, because duplication is far cheaper than the wrong abstraction. When two copies clearly encode the same rule, consolidate now. When you cannot yet tell whether they are one concept, wait for a third occurrence to show the shape before inventing a shared abstraction.
 
 ### Functions
 
@@ -94,7 +94,7 @@ Flat is better than nested: guard clauses and early returns. Name complex condit
 ### Errors
 
 - Errors never pass silently unless explicitly silenced, with the reason. Catching to log and continue is only right when continuing is correct.
-- Handle an error at the level that can act on it; elsewhere let it propagate. Keep a try block's body to one call so the handling is not tangled with the work.
+- Handle an error at the level that can act on it; elsewhere let it propagate. Keep try blocks narrow, around the operation that can fail, so the handling is not tangled with the work.
 - Raise with context: what was attempted, with what input. Define error types by what callers need to tell apart.
 - Validate at system boundaries (user input, network, files, external services), then trust internal invariants instead of re-checking everywhere.
 - Prefer designs where the error cannot occur: empty collections instead of null, idempotent operations, types that exclude the bad case.
@@ -158,7 +158,7 @@ State what is already good in a line. Skip what formatters and linters enforce. 
 
 Clean Code was written for 2008 Java. Its values transfer; several specifics do not, and literal application drives agents astray.
 
-- **Size targets.** "Functions of 2-4 lines, rarely 20" produces shallow fragments when taken literally. The book itself ranks "minimal classes and methods" as a design rule too. Use one level of abstraction and a nameable concept as the test, never a line count.
+- **Size targets.** "Functions of 2-4 lines, rarely 20" produces shallow fragments when taken literally; the book's own rules of simple design also call for keeping the count of functions and classes low. Use one level of abstraction and a nameable concept as the test, never a line count.
 - **Zero-argument functions.** Chasing low arity by promoting locals to instance fields hides data flow in shared state; the book notes this destroys cohesion. Prefer explicit parameters, a parameter object, or keyword options.
 - **Polymorphism over switch.** In TypeScript and Python, an exhaustive switch or `match` over a discriminated union is idiomatic and type-checked. The smell is the same switch repeated across modules, not a switch as such.
 - **Classes and non-static methods by default.** A Java habit. Module-level functions are the default unit in Python and TypeScript; reach for a class when state plus invariants need protecting or real polymorphism is needed.
