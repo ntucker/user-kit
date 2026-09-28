@@ -1,8 +1,8 @@
 # Smell catalog
 
-A language-neutral pass list generalized from Clean Code chapter 17 (codes in brackets map to the book), plus smells common in agent-written code. A smell is a prompt to look, not a verdict: confirm that the fix lowers the cost of a likely change before recommending it.
+A language-neutral pass list generalized from Clean Code chapter 17 (codes in brackets map to the book). Use it after checking the diff against the skill's "Before writing a new unit" steps and "After it works" list, which cover the smells agent-written code most often has. A smell is a prompt to look, not a verdict: confirm that the fix lowers the cost of a likely change before recommending it.
 
-Contents: Structure and ownership · Functions · Names · Control flow and expressions · Errors and precision · Comments · Tests · Environment · Agent-written code · Not transferable
+Contents: Structure and ownership · Functions · Names · Control flow and expressions · Errors and precision · Comments · Tests · Environment · Not transferable
 
 ## Structure and ownership
 
@@ -16,7 +16,8 @@ Contents: Structure and ownership · Functions · Names · Control flow and expr
 - **Hidden logical dependency** [G22]: a caller assumes a fact the callee owns (size, format, ordering). Make the callee expose it.
 - **Buried configuration** [G35]: defaults decided deep in low-level code instead of at the top and passed down.
 - **Transitive navigation** [G36]: callers walk an object graph (`a.b.c.do()`) through units that should hide their structure. Does not apply to plain data.
-- **Hybrid** [ch. 6]: a type that exposes all its state and also carries business rules, making both new operations and new variants hard.
+- **Hybrid** [ch. 6]: a type that exposes all its state and also carries business rules, making both new operations and new variants hard. Choose by which axis will change: plain data plus functions makes new operations easy; objects hiding state behind behavior make new variants easy.
+- **Illegal states representable**: optional fields and booleans that can contradict each other, validated repeatedly. Where the type system allows, make the bad combination unconstructable.
 - **Low cohesion** [ch. 10]: fields used by only a subset of methods, or a module whose functions share nothing. There is another unit trying to get out.
 - **Multiple reasons to change** [ch. 10, SRP]: one unit edited for unrelated kinds of change (for example, formatting and persistence).
 - **Arbitrary structure** [G32]: nesting, grouping, or placement with no reason visible in the structure, which invites others to change it arbitrarily.
@@ -86,19 +87,6 @@ Contents: Structure and ownership · Functions · Names · Control flow and expr
 
 - **Build requires more than one step** [E1]; **tests require more than one step** [E2].
 - **Multiple languages in one file** [G1]: large embedded SQL, HTML, or shell strings mixed with logic. Minimize their number and extent, or move them to dedicated files.
-
-## Agent-written code
-
-- A new helper that duplicates an existing one under a different name.
-- A boolean or `mode` parameter added to an existing function to handle a new caller.
-- New logic pasted into the middle of an existing function at a different level of abstraction.
-- One-caller wrappers and single-implementation interfaces, factories, or base classes "for flexibility".
-- Defensive checks for states the types or invariants already exclude.
-- Backward-compatibility shims, feature toggles, or fallback paths nobody asked for.
-- Options that restate library defaults (unless deliberately pinning behavior across upgrades).
-- `try` blocks that log and continue, or fallbacks that hide real failures.
-- Comments narrating the change ("now we also handle X") rather than stating a lasting constraint.
-- Debug output, unused imports, and parameters left from iteration.
 
 ## Not transferable
 
