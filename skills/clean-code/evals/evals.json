@@ -1,0 +1,120 @@
+{
+  "skill_name": "clean-code",
+  "notes": "Each case copies evals/files/<name>/ into a fresh workspace and runs the prompt there. Cases 1-8 target a judgment call agents get wrong; case 9 is a boundary case where the skill must NOT cause a broad rewrite.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "reuse-display-name",
+      "prompt": "add an order-shipped email next to the password reset one in src/notifications/email.ts. it should greet the user by name and include the tracking url",
+      "files": ["evals/files/reuse-display-name/"],
+      "expected_output": "orderShippedEmail(user, trackingUrl) in notifications/email.ts that greets with displayName(user) from users/format.ts. A search for preferredName/firstName finds displayName, which already trims and handles a missing last name; a second definition of how a person's name is shown would drift.",
+      "assertions": [
+        "The new email function calls displayName (imported from users/format)",
+        "No new function or inline expression combines preferredName/firstName/lastName outside users/format.ts",
+        "users/format.ts and profile/ProfileHeader.ts are unchanged"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "invoice-amount-column",
+      "prompt": "on invoices the Amount column header already says the currency, so the cells shouldn't repeat the symbol. show just the number, right aligned",
+      "files": ["evals/files/invoice-amount-column/"],
+      "expected_output": "The invoice module owns its layout: it formats the bare amount (using a nameable amount-formatting step, extracted into money/ only if it is a real concept such as a decimal-number formatter) and right-aligns the cell. formatPrice gets no invoice/symbol/boolean flag, because presentation for one caller is not a dimension of 'format a price' and would give it a second reason to change.",
+      "assertions": [
+        "formatPrice's signature gains no boolean, mode, or caller-specific parameter",
+        "Invoice amount cells render without a currency symbol and are right-aligned (style or class on the td)",
+        "cart/summary.ts is unchanged"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "coincidental-similarity",
+      "prompt": "there's duplicated normalization logic scattered around accounts/ and tags/. clean it up",
+      "files": ["evals/files/coincidental-similarity/"],
+      "expected_output": "tags/search.py re-implements normalize_tag inline twice; that is duplicated knowledge (the tag rule) and should call normalize_tag. normalize_email and normalize_tag are identical today but encode different rules owned by different modules (email: plus-addressing, IDN; tags: hyphens, length) and must stay separate; merging them into a shared normalize_string is the wrong abstraction.",
+      "assertions": [
+        "tags/search.py uses normalize_tag for both the query and the post tags",
+        "normalize_email and normalize_tag both still exist in their own modules and neither delegates to a new shared string-normalization helper",
+        "The response explains why the email and tag functions stay separate (different rules / reasons to change)"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "receipt-email",
+      "prompt": "after an order is placed we need to email the customer a receipt with the line items and total",
+      "files": ["evals/files/receipt-email/"],
+      "expected_output": "place_order gains one step at its level (send_receipt(order, user) or equivalent) after save. Receipt composition lives with notifications and sends through notifications/mailer.send_email; no EmailMessage/smtplib code in orders/. Total comes from Order.total_cents rather than being recomputed.",
+      "assertions": [
+        "place_order's body adds exactly one call for the receipt and no message-building or transport code",
+        "No module under orders/ imports smtplib or email.message",
+        "The receipt is sent via notifications.mailer.send_email",
+        "The receipt total uses Order.total_cents rather than re-summing line prices"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "shallow-wrappers",
+      "prompt": "simplify src/auth/users.ts, it feels like a lot of indirection for not much",
+      "files": ["evals/files/shallow-wrappers/"],
+      "expected_output": "getUserId and loadUser restate their bodies and hide nothing: inline them (user.id, repo.findUser) and update both routes. canManageBilling owns a real decision (impersonation, org owners) and stays. isAdmin/hasRole are borderline; either keeping or inlining is acceptable if reasoned.",
+      "assertions": [
+        "getUserId no longer exists and callers use user.id",
+        "loadUser no longer exists and callers call repo.findUser directly",
+        "canManageBilling still exists with the same impersonation and org-owner behavior",
+        "All call sites in routes/ compile against the new exports (no dangling imports)"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "totals-owner",
+      "prompt": "the checkout page needs to show subtotal, tax and total too, same numbers as the invoice",
+      "files": ["evals/files/totals-owner/"],
+      "expected_output": "Subtotal/tax/total are order knowledge; the renderer computing them is feature envy and would be duplicated by checkout. Move the computation to Order (properties or methods) or a tax module that owns rates; both InvoiceRenderer and checkout_summary read it. Invoice layout (Template, cents formatting) stays in invoice/, not moved into Order.",
+      "assertions": [
+        "The subtotal and tax computation exists in exactly one place, outside invoice/ and checkout/",
+        "invoice/render.py no longer imports TAX_RATES or sums line prices",
+        "checkout/page.py returns subtotal, tax, and total from that single source",
+        "orders/model.py contains no Template or string formatting of the invoice"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "importer-ordering",
+      "prompt": "admin uploads are letting rows with empty cells into the db. nightly job doesn't have this problem. fix it",
+      "files": ["evals/files/importer-ordering/"],
+      "expected_output": "Root cause: the Importer's steps communicate through hidden instance state, so nothing forces validateRows before write, and upload.ts skips it. Beyond adding the missing call, make the order structural: each step takes the previous step's output (schema -> rows -> validated rows -> write), or a single importFile(path) owns the sequence and both callers use it. The stale TODO about validation speed goes away.",
+      "assertions": [
+        "admin/upload.ts now validates rows before writing",
+        "Writing unvalidated rows is structurally prevented: write accepts validated rows as input, or both callers go through one function that owns the sequence",
+        "The '// TODO validate?' comment is removed",
+        "jobs/nightly.ts still imports and behaves the same (validates, returns the count)"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "config-errors",
+      "prompt": "users keep saying their timeout setting in ~/.exampleapp.json is ignored. can you figure out why and fix it",
+      "files": ["evals/files/config-errors/"],
+      "expected_output": "load_config catches every exception, logs a vague warning, and silently returns defaults, so any bad key or JSON error (e.g. 'timeout' instead of 'timeout_s', or a string value) looks like 'setting ignored'. Catch narrowly: a missing file is the only case where defaults may be policy, and that decision belongs to the caller (cli.py) catching one specific error. Malformed JSON and unknown keys raise with the path and offending key.",
+      "assertions": [
+        "load_config no longer contains `except Exception` or a bare except",
+        "A malformed file or unknown key produces an error naming the file path and, for unknown keys, the key",
+        "If missing-file falls back to defaults, that fallback is in cli.py (or the caller), catching one specific exception type",
+        "The response identifies the swallowed exception as the root cause"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "scoped-bugfix",
+      "prompt": "monthly_report blows up with ZeroDivisionError when there were no orders that month. quick fix please, this is going out in the hotfix",
+      "files": ["evals/files/scoped-bugfix/"],
+      "expected_output": "A minimal fix to the average for an empty month plus a test for it. The function has many smells (range(len), string-built CSV, fmt mode flag, section comments), but restructuring it inside a hotfix hides the behavior change; mention them as follow-ups instead.",
+      "assertions": [
+        "An empty month no longer raises and the average has a defined value",
+        "A test for the empty-month case is added and the existing tests still pass",
+        "The diff to monthly.py changes at most ~6 lines; the csv/text branches, the range(len) loop, and the signature are unchanged",
+        "The response mentions at least one larger cleanup as a follow-up rather than doing it"
+      ]
+    }
+  ]
+}

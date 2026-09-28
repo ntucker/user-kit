@@ -1,5 +1,7 @@
-const locale = 'en-US';
+export type Currency = 'USD' | 'EUR' | 'GBP';
 
-export function formatPrice(cents: number): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(cents / 100);
+const LOCALE = 'en-US';
+
+export function formatPrice(cents: number, currency: Currency = 'USD'): string {
+  return new Intl.NumberFormat(LOCALE, { style: 'currency', currency }).format(cents / 100);
 }

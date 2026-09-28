@@ -1,9 +1,13 @@
-import { formatPrice } from '../money/format';
-import type { Invoice } from './types';
+import { formatPrice, type Currency } from '../money/format';
 
-export function invoiceTableHtml(invoice: Invoice): string {
-  const rows = invoice.lines
-    .map((line) => `<tr><td>${line.description}</td><td>${formatPrice(line.cents)}</td></tr>`)
+export interface InvoiceLine {
+  description: string;
+  cents: number;
+}
+
+export function invoiceTableHtml(lines: InvoiceLine[], currency: Currency): string {
+  const rows = lines
+    .map((line) => `<tr><td>${line.description}</td><td>${formatPrice(line.cents, currency)}</td></tr>`)
     .join('');
-  return `<table><thead><tr><th>Item</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table class="invoice"><thead><tr><th>Item</th><th>Amount (${currency})</th></tr></thead><tbody>${rows}</tbody></table>`;
 }

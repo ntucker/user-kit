@@ -77,7 +77,7 @@ Wrap a third-party API at your boundary when its types and quirks would otherwis
 
 ### One level of abstraction per unit
 
-A function body reads as the steps one level below its name: "To X, we A, then B, then C." Mixing intent with mechanics (string assembly, index math, protocol or storage details) is the main source of unreadable functions, and once details mix in, more accrete. Sections in a function (setup, parse, compute, format) mean it does several things. Extract a group of statements when it is a lower-level concept whose name says more than its code.
+A function body reads as the steps one level below its name: "To X, we A, then B, then C." Mixing intent with mechanics (string assembly, index math, protocol or storage details) is the main source of unreadable functions, and once details mix in, more accrete. Sections in a function (setup, parse, compute, format) mean it does several things. Extract a group of statements when it is a lower-level concept whose name says more than its code. When steps must run in order, pass each step's output into the next so the order cannot be broken; steps that communicate through shared mutable state let a caller skip one.
 
 ### Deep units, not shallow ones
 
@@ -124,4 +124,3 @@ The book was written for 2008 Java. Its values transfer; these specifics mislead
 
 - Read [Python](references/python.md) when writing or reviewing Python.
 - Read [TypeScript](references/typescript.md) when writing or reviewing TypeScript or JavaScript.
-- Read [Worked examples](references/examples.md) when a judgment call is unclear: reuse vs. new, extend vs. separate, extract vs. inline, where a concept belongs, splitting flags, surfacing ordering, handling errors.
