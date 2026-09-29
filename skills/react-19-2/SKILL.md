@@ -9,7 +9,7 @@ Stable in 19.2: `<Activity>`, `useEffectEvent`, `cacheSignal`, React Performance
 
 ## Step 0: Confirm the version
 
-Check `react` and `react-dom` in `package.json`, then the resolved `node_modules/react/package.json`. Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply the `react-19-3` skill (`<ViewTransition>`, Fragment refs, `browser()`).
+Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply the `react-19-3` skill (`<ViewTransition>`, Fragment refs, `browser()`).
 
 ## Feature selection
 

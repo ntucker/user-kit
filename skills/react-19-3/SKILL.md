@@ -9,12 +9,9 @@ Stable in 19.3: `<ViewTransition>`, `addTransitionType`, Fragment refs (`Fragmen
 
 ## Step 0: Confirm the version
 
-Resolve the React that will actually run, not just what `package.json` requests:
+Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React and ignores the project's `react` dependency (Pages Router uses the project's own).
 
-- Plain apps: `node -p "require('react/package.json').version"` (same for `react-dom`).
-- Next.js App Router vendors React and ignores the project's `react` dependency. The vendored `package.json` has no `version`; read the bundle: `rg -o -m1 'exports\.version = "[^"]+"' node_modules/next/dist/compiled/react/cjs/react.production.js`. Pages Router uses the project's own `react`.
-
-Require `>= 19.3.0`. A `19.3.0-canary-*` build is a snapshot from its date and can have some 19.3 APIs but not others. On a canary, confirm the specific export before using it, e.g. `rg -c 'exports\.browser =' node_modules/next/dist/compiled/react-dom/cjs/react-dom.production.js`, or `'ViewTransition' in React` at runtime.
+Require `>= 19.3.0`. A `19.3.0-canary-*` build is a snapshot from its date and can have some 19.3 APIs but not others, so on a canary confirm the specific export exists before using it.
 
 If the version is older, do not emit these APIs: say the feature needs 19.3, offer the upgrade, and use a pre-19.3 fallback only if the user declines.
 
