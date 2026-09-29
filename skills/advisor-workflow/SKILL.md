@@ -18,7 +18,7 @@ You are the implementer. **Objective: maximize quality; at a given quality level
 | `principal-advisor` | the dominating decision (step 3); valve when in its domain (step 5); unresolved critical findings (step 6) | ~1 consult, resumed for follow-ups |
 | `quality-reviewer` | end review of the diff (step 6) | 1, plus re-review after large fixes |
 
-What each advisor is good at, its model, its write access, and its launch mode are owned by its definition in `~/.cursor/agents/<name>.md` (description shown in your subagent list); this table owns only where this workflow calls it. Defaults are calibration points; the spend policy decides when to exceed them.
+What each advisor is good at, its model, its write access, and its launch mode are owned by its definition file, `agents/<name>.md` in the plugin that ships this skill (description shown in your subagent list); this table owns only where this workflow calls it. Defaults are calibration points; the spend policy decides when to exceed them.
 
 ## What a consult buys
 
@@ -28,7 +28,7 @@ Three separable sources of value:
 2. **Different training.** Different correlated errors; no self-preference for output it recognizes as its own (Panickssery et al. 2024); heterogeneous proposers of comparable quality beat same-model resampling (Wang et al. 2024). Cross-family only — a fresh context does not change the weights.
 3. **More capability or effort** than you run at.
 
-Family is the provider (`claude-*` Anthropic, `gpt-*` OpenAI, grok xAI, composer Cursor); versions, codenames, effort suffixes, and a "Cursor" host prefix (as in "Cursor Grok") do not change it. Your system prompt names your model; each advisor's subagent description states its model and effort. If a description omits it, read `model:` from the definition (`.cursor/agents/<name>.md`, else `~/.cursor/agents/`). Cursor substitutes a compatible model if your plan or admin blocks the configured one.
+Family is the provider (`claude-*` Anthropic, `gpt-*` OpenAI, grok xAI, composer Cursor); versions, codenames, effort suffixes, and a "Cursor" host prefix (as in "Cursor Grok") do not change it. Your system prompt names your model; each advisor's subagent description states its model and effort. If a description omits it, read `model:` from the definition (`.cursor/agents/<name>.md`, else this plugin's `agents/<name>.md`, else `~/.cursor/agents/`). Cursor substitutes a compatible model if your plan or admin blocks the configured one.
 
 When an advisor shares your family, consult it only if clean context or its higher effort is worth the cost: your context is long (deep into a task, many tool outputs) or holds failed attempts on this question, or the role is `quality-reviewer` — a fresh reader of your diff pays, though its "no issues" is weaker evidence because self-preference survives a fresh context. Otherwise perform the role yourself with its definition file as the checklist, or, if the other of `design-advisor`/`principal-advisor` is cross-family, send the question to it: step 3's exclusivity is then off, and because it answers outside its role, treat its answer as a second opinion to weigh, not the authority.
 
