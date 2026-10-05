@@ -10,8 +10,7 @@
   "plugins": [
     {
       "name": "user-kit",
-      "source": "./",
-      "description": "Personal skills and subagents shared with Cursor."
+      "source": "./"
     }
   ]
 }

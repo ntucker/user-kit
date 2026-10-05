@@ -21,29 +21,39 @@ SOURCE = ROOT / "agents"
 TARGET = ROOT / "claude" / "agents"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 
-MODEL_LINE = re.compile(r"^model:\s*(\S+?)(?:\[effort=(\w+)\])?\s*$", re.M)
+MODEL_LINE = re.compile(r"^model:\s*(\S+?)(?:\[effort=([\w-]+)\])?\s*$", re.M)
 READONLY_LINE = re.compile(r"^readonly:\s*true\s*$", re.M)
 HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_agents.py. Do not edit. -->\n"
 
 
-def to_claude(text: str) -> str:
+CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
+EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+
+def to_claude(name: str, frontmatter: str) -> str:
+    """Rewrite Cursor frontmatter for Claude Code, failing on values Claude Code would reject."""
+
     def replace(match: re.Match) -> str:
         model, effort = match.group(1), match.group(2)
-        if re.fullmatch(r"(opus|sonnet|haiku|fable)-\d.*", model):
-            model = f"claude-{model}"
+        if not CLAUDE_MODEL.fullmatch(model):
+            sys.exit(f"agents/{name}: model {model!r} is not a Claude Code model")
+        if effort and effort not in EFFORTS:
+            sys.exit(f"agents/{name}: effort {effort!r} is not one of {sorted(EFFORTS)}")
         return f"model: {model}" + (f"\neffort: {effort}" if effort else "")
 
-    text = MODEL_LINE.sub(replace, text, count=1)
-    return READONLY_LINE.sub("disallowedTools: Write, Edit, NotebookEdit", text, count=1)
+    frontmatter = MODEL_LINE.sub(replace, frontmatter, count=1)
+    return READONLY_LINE.sub("disallowedTools: Write, Edit, NotebookEdit", frontmatter, count=1)
 
 
 def expected() -> dict[Path, str]:
     files = {}
     for source in sorted(SOURCE.glob("*.md")):
-        text = to_claude(source.read_text())
+        text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         files[TARGET / source.name] = (
-            text[:frontmatter_end] + HEADER.format(name=source.name) + text[frontmatter_end:]
+            to_claude(source.name, text[:frontmatter_end])
+            + HEADER.format(name=source.name)
+            + text[frontmatter_end:]
         )
     manifest = json.loads(MANIFEST.read_text())
     manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in files]

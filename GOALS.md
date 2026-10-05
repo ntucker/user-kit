@@ -20,7 +20,7 @@ These constraints are the contract for anyone editing this tree. A change that v
 
 ## Claude Code
 
-9. **The same tree is a Claude Code plugin.** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are both named `user-kit`, with one plugin whose `source` is `"./"`. Claude Code reads `skills/` directly.
+9. **The same tree is a Claude Code plugin.** It loads `skills/` directly, so skills are shared as-is.
 10. **`claude/agents/` is generated.** Edit `agents/`, then run `python3 scripts/build_claude_agents.py`. It also rewrites the `agents` list in `.claude-plugin/plugin.json`. Never hand-edit either.
 
 Adding files for another tool is fine when it does not rename, move, or replace the Cursor manifest, `skills/`, or `agents/`.

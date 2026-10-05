@@ -14,15 +14,6 @@ The repo is a Claude Code plugin marketplace with one plugin, `user-kit`. Skills
 
 ### For everyone
 
-Inside Claude Code:
-
-```
-/plugin marketplace add ntucker/user-kit
-/plugin install user-kit@user-kit
-```
-
-Or from a shell:
-
 ```sh
 claude plugin marketplace add ntucker/user-kit
 claude plugin install user-kit@user-kit --scope user
@@ -30,7 +21,9 @@ claude plugin install user-kit@user-kit --scope user
 
 `--scope user` makes it available in every repo. Use `--scope project` to record it in the current repo's `.claude/settings.json` instead.
 
-The plugin has no `version`, so Claude Code tracks the git commit. Third-party marketplaces do not auto-update by default. Pull new commits with:
+Inside Claude Code, `/plugin marketplace add ntucker/user-kit` and `/plugin install user-kit@user-kit` do the same.
+
+The plugin has no `version`, so updates follow git commits. They are not automatic by default. Pull them with:
 
 ```sh
 claude plugin marketplace update user-kit
@@ -83,7 +76,7 @@ Edit `agents/<name>.md`, then run:
 python3 scripts/build_claude_agents.py
 ```
 
-Claude Code rejects Cursor's `model: claude-opus-5-5[effort=high]` with a 404, so the script writes copies with `model` and `effort` as separate fields, turns `readonly: true` into `disallowedTools`, and lists the copies in `.claude-plugin/plugin.json`. CI runs it with `--check` and fails when the copies are stale.
+It writes the Claude Code copies and their list in `.claude-plugin/plugin.json`. The script's docstring explains why the copies exist. CI fails when they are stale.
 
 ## License
 
