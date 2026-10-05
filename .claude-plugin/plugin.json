@@ -1,0 +1,23 @@
+{
+  "name": "user-kit",
+  "description": "Personal skills and subagents (advisor workflow, human-first planning, clean code, React, REST API design, skill authoring).",
+  "author": {
+    "name": "Nathaniel Tucker",
+    "email": "me@ntucker.me"
+  },
+  "repository": "https://github.com/ntucker/user-kit",
+  "homepage": "https://github.com/ntucker/user-kit",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "agents",
+    "personal"
+  ],
+  "agents": [
+    "./claude/agents/design-advisor.md",
+    "./claude/agents/frontend-design-advisor.md",
+    "./claude/agents/principal-advisor.md",
+    "./claude/agents/quality-reviewer.md",
+    "./claude/agents/test-fable.md"
+  ]
+}
