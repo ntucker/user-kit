@@ -76,7 +76,7 @@ Edit `agents/<name>.md`, then run:
 python3 scripts/build_claude_agents.py
 ```
 
-It writes the Claude Code copies and their list in `.claude-plugin/plugin.json`. The script's docstring explains why the copies exist. CI fails when they are stale.
+It writes the Claude Code copies and their list in `.claude-plugin/plugin.json`. The script's docstring explains why the copies exist. On pull requests CI fails when they are stale. On `main`, where `cursor-skills-sync` pushes without running the script, CI regenerates and commits them.
 
 ## License
 
