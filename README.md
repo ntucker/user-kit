@@ -4,9 +4,9 @@ Personal Cursor skills and subagents. This repository is the **origin source of 
 
 This repository is public. Do not put secrets in skills.
 
-**Do not install this repo from the Cursor marketplace.** A personal GitHub import pins the first-import SHA and, with the same plugin name `user-kit`, overrides the local checkout and freezes that desktop. Cloud Agents, Grok, and Projects get a dated snapshot (`user-kit-YYYY-MM-DD`) via `/cut-cloud` in the sync engine.
+**Do not install this repo from the Cursor marketplace.** A personal GitHub import pins the first-import SHA and, with the same plugin name `user-kit`, overrides the local checkout and freezes that desktop. Updating or reinstalling this same URL does not move that pin. Cloud Agents, Grok, and Projects get a dated snapshot (`user-kit-YYYY-MM-DD`) via `/cut-cloud` in the sync engine.
 
-Goals: [`GOALS.md`](GOALS.md). Engine (hooks, `/cut-cloud`): `~/.cursor/plugins/local/cursor-skills-sync/GOALS.md`.
+The contract for editing this repo is [`GOALS.md`](GOALS.md) and [`AGENTS.md`](AGENTS.md). Hooks and `/cut-cloud` stay in the separate `cursor-skills-sync` engine.
 
 ## Layout
 
