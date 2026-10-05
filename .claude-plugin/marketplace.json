@@ -1,0 +1,16 @@
+{
+  "name": "user-kit",
+  "owner": {
+    "name": "Nathaniel Tucker",
+    "email": "me@ntucker.me"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace for personal Claude Code skills and subagents."
+  },
+  "plugins": [
+    {
+      "name": "user-kit",
+      "source": "./"
+    }
+  ]
+}

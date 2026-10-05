@@ -21,4 +21,9 @@ These constraints are the contract for anyone editing this tree. A change that v
 7. **Agent files keep Cursor frontmatter.** `name` and `description` identify and route the agent. Removing `model` runs it on the default model. Removing `readonly: true` lets it edit files. Do not strip either to suit another tool.
 8. **This tree is public.** No secrets, tokens, or private data.
 
+## Claude Code
+
+9. **The same tree is a Claude Code plugin.** It loads `skills/` directly, so skills are shared as-is.
+10. **`claude/agents/` is generated.** Edit `agents/`, then run `python3 scripts/build_claude_agents.py`. It also rewrites the `agents` list in `.claude-plugin/plugin.json`. Never hand-edit either. CI regenerates them on `main` when a sync pushes `agents/` changes without them.
+
 Adding files for another tool is fine when it does not rename, move, or replace the Cursor manifest, `skills/`, or `agents/`.
