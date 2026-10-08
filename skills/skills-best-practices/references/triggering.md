@@ -25,7 +25,7 @@ Keep queries multi-step; one-step tasks rarely trigger regardless of description
 
 ## Measuring
 
-`trigger_eval.py` runs each query through the Cursor CLI headless in plan mode (read-only, at some fidelity cost versus agent mode), counts a run as triggered when the agent reads `<skill>/SKILL.md`, and reports pass/fail per query:
+`trigger_eval.py` runs each query through the harness CLI headless in plan mode (read-only, at some fidelity cost versus agent mode) and reports pass/fail per query. A run counts as triggered when the agent reads `<skill>/SKILL.md`, or in Claude Code also when it calls the Skill tool with the skill's name. `--harness` defaults to `auto`, which picks `claude` inside Claude Code and `cursor` (the `agent` CLI) otherwise:
 
 ```bash
 python3 <skill-dir>/scripts/trigger_eval.py --queries queries.json \
@@ -33,7 +33,14 @@ python3 <skill-dir>/scripts/trigger_eval.py --queries queries.json \
   --workspace /path/where/skill/is/discoverable --runs 3 --model <model>
 ```
 
-Smoke-test first: one obviously-positive query with `--runs 1`. If it does not trigger, inspect a raw `agent -p --output-format stream-json` run before trusting any batch result. Always pass `--model`, chosen per the eval-model rule from `agent --list-models`; the CLI's Auto default hides which model was tested. Read slug suffixes carefully—"low" and "fast" mean effort and latency, not price, so `<frontier>-low-fast` is still a frontier model and `<budget>-low` tests laziness rather than the description. Confirm the model actually used from the `system` init event in the stream. Budget: positives finish in seconds, negatives run to completion (a minute or more), so 20 queries × 3 runs is roughly 30–60 minutes; start with `--runs 1` on the train set and use 3 only for borderline queries. Without the CLI, start fresh chats manually and check whether the transcript shows a read of the skill file—the same signal, by hand.
+Always pass `--model`, chosen per the eval-model rule; a harness default hides which model was tested.
+
+| Harness | Model | Discoverability | Raw run to inspect |
+|---|---|---|---|
+| Cursor | A slug from `agent --list-models`. Read suffixes carefully: "low" and "fast" mean effort and latency, not price, so `<frontier>-low-fast` is still a frontier model and `<budget>-low` tests laziness rather than the description | The skill must sit under a Cursor skills root of `--workspace` | `agent -p --output-format stream-json`; confirm the model from the `system` init event |
+| Claude Code | `--model haiku --effort medium` | The skill must sit in `<workspace>/.claude/skills/` or `~/.claude/skills/`; the script aborts when the init event's skill list lacks it, and warns when a plugin copy (`<plugin>:<name>`) competes, since calls to that copy are not counted | `claude -p --output-format stream-json --verbose`, run from the workspace; the init event names the model |
+
+Smoke-test first: one obviously-positive query with `--runs 1`. If it does not trigger, inspect a raw run before trusting any batch result. Budget: positives finish in seconds, negatives run to completion (a minute or more), so 20 queries × 3 runs is roughly 30–60 minutes; start with `--runs 1` on the train set and use 3 only for borderline queries. Without the CLI, start fresh sessions manually and check whether the transcript shows the skill being loaded—the same signal, by hand.
 
 ## Optimization loop
 
