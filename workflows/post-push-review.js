@@ -63,12 +63,13 @@ const GOALS = `${
   extraGoals ? `This work serves these goals:\n${extraGoals}\n` : ""
 }Also read the repo's own stated goals, if it has any: a GOALS.md, or the goals, principles or philosophy sections of README, CONTRIBUTING, AGENTS.md or CLAUDE.md. With no stated goals, judge against what the commits say they set out to do.`;
 
-const brief = (focus) => `You are reviewing a pushed change in ${
-  repo
-    ? `the git repository at ${repo} (run git there with -C)`
-    : "this repository"
-}.
-Start with \`git log ${logRange}\` for intent and \`git diff --stat ${range}\` for scope, then read \`git diff ${range} -- <paths>\` for the files that matter and open the surrounding code as needed. Skip lockfiles and generated, vendored or build-output files.
+const git = repo ? `git -C ${repo}` : "git";
+const where = repo
+  ? `the repository at ${repo}. Resolve every file you read or search, goal docs included, under that path`
+  : "this repository";
+
+const brief = (focus) => `You are reviewing a pushed change in ${where}.
+Start with \`${git} log ${logRange}\` for intent and \`${git} diff --stat ${range}\` for scope, then read \`${git} diff ${range} -- <paths>\` for the files that matter and open the surrounding code as needed. Skip lockfiles and generated, vendored or build-output files.
 
 ${focus}
 
@@ -76,7 +77,7 @@ Rules:
 - Review only what the diff changes or breaks; pre-existing problems it doesn't touch are out of scope.
 - Report real problems only, each with evidence from the code. No praise, no summaries, no restating the diff.
 - Return an empty findings list when you find nothing; don't invent findings to fill it.
-- If git cannot read the range, return one blocker finding saying so instead of an empty list.
+- If git cannot read the range, return one blocker finding with file "(range)" saying so instead of an empty list.
 - Do not edit files, commit, or push.`;
 
 const REVIEWERS = [
@@ -99,7 +100,7 @@ Actively hunt for bugs: edge cases (empty, null, very large, concurrent, repeate
   {
     name: "reuse",
     prompt: brief(`Focus: reuse.
-Find anything the change built that should have reused something that already exists. Search the whole repo, not just the files near the change, for existing functions, types, components, styles and utilities that do the same job, and name the one to use with its path. Strongly prefer code already in the repo; a new external dependency (or suggesting one) needs a strong case.`),
+Find anything the change built that should have reused something that already exists. Search the whole repo, not just the files near the change, for existing functions, types, components, hooks, styles, tokens and utilities that do the same job, and name the one to use with its path. Strongly prefer code already in the repo; a new external dependency (or suggesting one) needs a strong case.`),
   },
   {
     name: "data-flow",
@@ -135,7 +136,7 @@ for (const [i, { name }] of REVIEWERS.entries()) {
   }
 }
 const failed = outcomes.filter((r) => r.status === "failed");
-// an empty findings list must never stand for a review that didn't run
+// a run where no reviewer returned must not read as a clean review
 if (failed.length === REVIEWERS.length)
   throw new Error("post-push-review: no reviewer returned a result");
 if (failed.length)
