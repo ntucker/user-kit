@@ -20,7 +20,8 @@ const {
   goals: extraGoals,
   repo,
 } = typeof parsed === "string" ? { range: parsed } : (parsed ?? {});
-if (!range || !/^[^\s"'{}]+$/.test(range)) {
+// a git revision range, safe to put unquoted in the reviewers' shell commands
+if (typeof range !== "string" || !/^(?!-)[\w./@{}~^:-]+$/.test(range)) {
   throw new Error(
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
