@@ -20,8 +20,8 @@ const {
   goals: extraGoals,
   repo,
 } = typeof parsed === "string" ? { range: parsed } : (parsed ?? {});
-// a git revision range, safe to put unquoted in the reviewers' shell commands
-if (typeof range !== "string" || !/^(?!-)[\w./@{}~^:-]+$/.test(range)) {
+// non-empty, and no leading "-" so git can't read it as an option
+if (typeof range !== "string" || !/^[^-\s]\S*$/.test(range)) {
   throw new Error(
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
@@ -71,14 +71,15 @@ const GOALS = `${
   extraGoals ? `This work serves these goals:\n${extraGoals}\n` : ""
 }Also read the repo's own stated goals, if it has any: a GOALS.md, or the goals, principles or philosophy sections of README, CONTRIBUTING, AGENTS.md or CLAUDE.md. With no stated goals, judge against what the commits say they set out to do.`;
 
-// single-quoted for the shell (each ' becomes '\'') so the path stays one argument
-const git = repo ? `git -C '${repo.replaceAll("'", "'\\''")}'` : "git";
+// single-quote for the shell (each ' becomes '\'') so the value stays one argument
+const sh = (s) => `'${s.replaceAll("'", "'\\''")}'`;
+const git = repo ? `git -C ${sh(repo)}` : "git";
 const where = repo
   ? `the repository at ${repo}. Resolve every file you read or search, goal docs included, under that path`
   : "this repository";
 
 const brief = (focus) => `You are reviewing a pushed change in ${where}.
-Start with \`${git} log ${logRange}\` for intent and \`${git} diff --stat ${range}\` for scope, then read \`${git} diff ${range} -- <paths>\` for the files that matter and open the surrounding code as needed. Skip lockfiles and generated, vendored or build-output files.
+Start with \`${git} log ${sh(logRange)}\` for intent and \`${git} diff --stat ${sh(range)}\` for scope, then read \`${git} diff ${sh(range)} -- <paths>\` for the files that matter and open the surrounding code as needed. Skip lockfiles and generated, vendored or build-output files.
 
 ${focus}
 
