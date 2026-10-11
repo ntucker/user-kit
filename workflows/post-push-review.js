@@ -4,15 +4,18 @@ export const meta = {
   description:
     "Parallel Haiku review of a pushed diff: goals, engineering, adversarial, reuse, and React data flow",
   whenToUse:
-    'After pushing commits, in any git repo. args: { range, goals? } or just the range string. range covers only the pushed commits: "<sha before push>..HEAD", or "origin/<default branch>...HEAD" (three dots) for a whole branch. goals: the goals this work serves, as text (from your project instructions or memory); the repo\'s own goal docs are read as well. Returns unverified findings; the caller verifies each one.',
+    'After pushing commits, in any git repo. args: { range, goals?, repo? } or just the range string. range covers only the pushed commits: "<sha before push>..HEAD", or "origin/<default branch>...HEAD" (three dots) for a whole branch. goals: the goals this work serves, as text (from your project instructions or memory); the repo\'s own goal docs are read as well. repo: path to the repository when it is not the working directory. Returns unverified findings; the caller verifies each one.',
   phases: [{ title: "Review", model: "haiku" }],
 };
 
 // Run by the Workflow tool, which provides args, agent, parallel, phase and log
 // and wraps this body in an async function (so top-level await and return work).
 
-const { range, goals: extraGoals } =
-  typeof args === "string" ? { range: args } : (args ?? {});
+const {
+  range,
+  goals: extraGoals,
+  repo,
+} = typeof args === "string" ? { range: args } : (args ?? {});
 if (!range) {
   throw new Error(
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
@@ -60,7 +63,11 @@ const GOALS = `${
   extraGoals ? `This work serves these goals:\n${extraGoals}\n` : ""
 }Also read the repo's own stated goals, if it has any: a GOALS.md, or the goals, principles or philosophy sections of README, CONTRIBUTING, AGENTS.md or CLAUDE.md. With no stated goals, judge against what the commits say they set out to do.`;
 
-const brief = (focus) => `You are reviewing a pushed change in this repository.
+const brief = (focus) => `You are reviewing a pushed change in ${
+  repo
+    ? `the git repository at ${repo} (run git there with -C)`
+    : "this repository"
+}.
 Start with \`git log ${logRange}\` for intent and \`git diff --stat ${range}\` for scope, then read \`git diff ${range} -- <paths>\` for the files that matter and open the surrounding code as needed. Skip lockfiles and generated, vendored or build-output files.
 
 ${focus}
@@ -69,6 +76,7 @@ Rules:
 - Review only what the diff changes or breaks; pre-existing problems it doesn't touch are out of scope.
 - Report real problems only, each with evidence from the code. No praise, no summaries, no restating the diff.
 - Return an empty findings list when you find nothing; don't invent findings to fill it.
+- If git cannot read the range, return one blocker finding saying so instead of an empty list.
 - Do not edit files, commit, or push.`;
 
 const REVIEWERS = [
@@ -86,12 +94,12 @@ Flag: unclear naming, functions doing more than one thing or mixing levels of ab
   {
     name: "adversarial",
     prompt: brief(`Focus: break the change.
-Actively hunt for bugs: edge cases (empty, null, very large, concurrent, repeated, out-of-order), regressions in callers of changed code, wrong assumptions about inputs or environment, error paths, SSR vs browser differences, and light/dark or mobile/desktop differences for UI. For each finding give the concrete input or sequence that triggers it and what goes wrong.`),
+Actively hunt for bugs: edge cases (empty, null, very large, concurrent, repeated, out-of-order), regressions in callers of changed code, wrong assumptions about inputs or environment, and error paths; for UI changes also server vs browser rendering, light/dark themes, and small vs large screens. For each finding give the concrete input or sequence that triggers it and what goes wrong.`),
   },
   {
     name: "reuse",
     prompt: brief(`Focus: reuse.
-Find anything the change built that should have reused something that already exists. Search the whole repo, not just the files near the change, for existing helpers, components, hooks, styles, tokens and utilities that do the same job, and name the one to use with its path. Strongly prefer code already in the repo; a new external dependency (or suggesting one) needs a strong case.`),
+Find anything the change built that should have reused something that already exists. Search the whole repo, not just the files near the change, for existing functions, types, components, styles and utilities that do the same job, and name the one to use with its path. Strongly prefer code already in the repo; a new external dependency (or suggesting one) needs a strong case.`),
   },
   {
     name: "data-flow",
@@ -127,6 +135,9 @@ for (const [i, { name }] of REVIEWERS.entries()) {
   }
 }
 const failed = outcomes.filter((r) => r.status === "failed");
+// an empty findings list must never stand for a review that didn't run
+if (failed.length === REVIEWERS.length)
+  throw new Error("post-push-review: no reviewer returned a result");
 if (failed.length)
   log(`No result from: ${failed.map((r) => r.name).join(", ")}`);
 
