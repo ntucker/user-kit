@@ -11,12 +11,16 @@ export const meta = {
 // Run by the Workflow tool, which provides args, agent, parallel, phase and log
 // and wraps this body in an async function (so top-level await and return work).
 
+// a caller may pass the object JSON-encoded, even twice; any other string is the range
+let parsed = args;
+while (typeof parsed === "string" && /^\s*["{]/.test(parsed))
+  parsed = JSON.parse(parsed);
 const {
   range,
   goals: extraGoals,
   repo,
-} = typeof args === "string" ? { range: args } : (args ?? {});
-if (!range) {
+} = typeof parsed === "string" ? { range: parsed } : (parsed ?? {});
+if (!range || !/^[^\s"'{}]+$/.test(range)) {
   throw new Error(
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
