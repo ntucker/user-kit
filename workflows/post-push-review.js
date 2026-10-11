@@ -20,13 +20,8 @@ const {
   goals: extraGoals,
   repo,
 } = typeof parsed === "string" ? { range: parsed } : (parsed ?? {});
-// fail fast on what no revision range contains: whitespace, quotes, shell
-// metacharacters, or a leading "-" git would read as an option. Commands still
-// pass it through sh() below.
-if (
-  typeof range !== "string" ||
-  !/^[^-\s"'`$;|&<>()\\][^\s"'`$;|&<>()\\]*$/.test(range)
-) {
+// non-empty, and no leading "-" so git can't read it as an option
+if (typeof range !== "string" || !/^[^-\s]\S*$/.test(range)) {
   throw new Error(
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
