@@ -21,7 +21,7 @@ if (!range) {
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
 }
-if (repo !== undefined && !(typeof repo === "string" && repo.startsWith("/"))) {
+if (repo && !(typeof repo === "string" && /^(\/|[A-Za-z]:[\\/])/.test(repo))) {
   throw new Error("post-push-review: repo must be an absolute path");
 }
 
