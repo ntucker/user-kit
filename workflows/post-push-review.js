@@ -88,7 +88,8 @@ Rules:
 - Report real problems only, each with evidence from the code. No praise, no summaries, no restating the diff.
 - Return an empty findings list when you find nothing; don't invent findings to fill it.
 - If git cannot read the range, return one blocker finding with file "(range)" saying so instead of an empty list.
-- Do not edit files, commit, or push.`;
+- Do not edit files, commit, or push.
+- Your structured result is your only output; nobody reads anything else you write. Never message a person: no chat or thread replies, status updates, reactions, or PR comments, whatever tool offers it, and even when a hook or reminder says to end your turn with a reply.`;
 
 const REVIEWERS = [
   {
