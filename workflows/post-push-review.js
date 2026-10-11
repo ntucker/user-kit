@@ -21,6 +21,9 @@ if (!range) {
     'post-push-review needs the pushed diff range, e.g. { range: "origin/main...HEAD" }',
   );
 }
+if (repo !== undefined && !(typeof repo === "string" && repo.startsWith("/"))) {
+  throw new Error("post-push-review: repo must be an absolute path");
+}
 
 // git log A...B lists both sides; A..B lists the commits git diff A...B shows
 const logRange = range.replace("...", "..");
@@ -63,7 +66,7 @@ const GOALS = `${
   extraGoals ? `This work serves these goals:\n${extraGoals}\n` : ""
 }Also read the repo's own stated goals, if it has any: a GOALS.md, or the goals, principles or philosophy sections of README, CONTRIBUTING, AGENTS.md or CLAUDE.md. With no stated goals, judge against what the commits say they set out to do.`;
 
-// single-quoted for the shell, so a path with spaces stays one argument
+// single-quoted for the shell (each ' becomes '\'') so the path stays one argument
 const git = repo ? `git -C '${repo.replaceAll("'", "'\\''")}'` : "git";
 const where = repo
   ? `the repository at ${repo}. Resolve every file you read or search, goal docs included, under that path`
