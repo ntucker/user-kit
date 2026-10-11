@@ -4,7 +4,7 @@ export const meta = {
   description:
     "Parallel Haiku review of a pushed diff: goals, engineering, adversarial, reuse, and React data flow",
   whenToUse:
-    'After pushing commits, in any git repo. args: { range, goals?, repo? } or just the range string. range covers only the pushed commits: "<sha before push>..HEAD", or "origin/<default branch>...HEAD" (three dots) for a whole branch. goals: the goals this work serves, as text (from your project instructions or memory); the repo\'s own goal docs are read as well. repo: path to the repository when it is not the working directory. Returns unverified findings; the caller verifies each one.',
+    'After pushing commits, in any git repo. args: { range, goals?, repo? } or just the range string. range covers only the pushed commits: "<sha before push>..HEAD", or "origin/<default branch>...HEAD" (three dots) for a whole branch. goals: the goals this work serves, as text (from your project instructions or memory); the repo\'s own goal docs are read as well. repo: absolute path to the repository when it is not the working directory. Returns unverified findings; the caller verifies each one.',
   phases: [{ title: "Review", model: "haiku" }],
 };
 
@@ -63,7 +63,8 @@ const GOALS = `${
   extraGoals ? `This work serves these goals:\n${extraGoals}\n` : ""
 }Also read the repo's own stated goals, if it has any: a GOALS.md, or the goals, principles or philosophy sections of README, CONTRIBUTING, AGENTS.md or CLAUDE.md. With no stated goals, judge against what the commits say they set out to do.`;
 
-const git = repo ? `git -C ${repo}` : "git";
+// single-quoted for the shell, so a path with spaces stays one argument
+const git = repo ? `git -C '${repo.replaceAll("'", "'\\''")}'` : "git";
 const where = repo
   ? `the repository at ${repo}. Resolve every file you read or search, goal docs included, under that path`
   : "this repository";
