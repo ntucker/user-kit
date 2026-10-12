@@ -5,12 +5,17 @@
     "email": "me@ntucker.me"
   },
   "metadata": {
-    "description": "Single-plugin marketplace for personal Claude Code skills and subagents."
+    "description": "Personal Claude Code skills and subagents (user-kit), plus Claude Code mods."
   },
   "plugins": [
     {
       "name": "user-kit",
       "source": "./"
+    },
+    {
+      "name": "pr-steward",
+      "source": "./mods/pr-steward",
+      "description": "Claude Code mod: keeps the current branch's PR (CI, review threads, conflicts, preview) in a pane and status line, with /land and a pr_status tool"
     }
   ]
 }

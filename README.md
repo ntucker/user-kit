@@ -66,6 +66,7 @@ Use this instead of the GitHub marketplace on the authoring machine, not alongsi
 - `agents/<name>.md` — subagents, in Cursor frontmatter
 - `claude/agents/<name>.md` — generated Claude Code copies of `agents/`
 - `workflows/<name>.js` — Claude Code Workflow scripts, run as `user-kit:<name>` (Cursor ignores them)
+- `mods/<name>/` — Claude Code mods, each its own plugin in the Claude marketplace (install `<name>@user-kit`; Cursor ignores them)
 - `.cursor-plugin/` — Cursor manifest and marketplace
 - `.claude-plugin/` — Claude Code manifest and marketplace
 
