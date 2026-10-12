@@ -63,7 +63,14 @@ const PR = {
     ],
   },
   commits: {
-    nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: ROLLUP } } } }],
+    nodes: [
+      {
+        commit: {
+          oid: 'aaa',
+          statusCheckRollup: { contexts: { nodes: ROLLUP } },
+        },
+      },
+    ],
   },
 };
 
@@ -287,4 +294,49 @@ test('/land without a PR says so and submits nothing', async ($, on) => {
   });
   expect(ran.text).toBe('No pull request is open for branch faster-search.');
   expect(prompts).toHaveLength(0);
+});
+
+describe('toasts', () => {
+  const settled = (oid: string) => ({
+    ...PR,
+    commits: {
+      nodes: [
+        {
+          commit: {
+            oid,
+            statusCheckRollup: {
+              contexts: {
+                nodes: ROLLUP.filter(c => c.status !== 'IN_PROGRESS'),
+              },
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  /** Reads PR, then `then`, collecting the toasts the second read raised */
+  async function toastsAfter($: any, on: On, then: unknown) {
+    let pr: unknown = PR;
+    fakeHost(on, async argv => ghRun(pr)(argv));
+    const toasts: string[] = [];
+    on('ui.toast', ($, e) => {
+      toasts.push(e.text);
+      return { value: undefined };
+    });
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    pr = then;
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    return toasts;
+  }
+
+  test("says when the same commit's CI settles", async ($, on) => {
+    expect(await toastsAfter($, on, settled('aaa'))).toEqual([
+      'PR #4300: 1 failing (ci/circleci: lint)',
+    ]);
+  });
+
+  test("stays quiet while a new push's checks arrive", async ($, on) => {
+    expect(await toastsAfter($, on, settled('bbb'))).toEqual([]);
+  });
 });

@@ -39,6 +39,7 @@ const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
         commits(last: 1) {
           nodes {
             commit {
+              oid
               statusCheckRollup {
                 contexts(first: 100) {
                   nodes {
@@ -163,9 +164,9 @@ async function readPr(run: Run, readText: ReadText): Promise<PrSnapshot> {
     : repository?.pullRequests?.nodes?.[0];
   if (!raw) return { kind: 'none', branch };
   const config = await readConfig(readText, `${root}/${CONFIG_PATH}`);
-  const checks = parseChecks(
-    raw.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes,
-  );
+  const commit = raw.commits?.nodes?.[0]?.commit;
+  const checks = parseChecks(commit?.statusCheckRollup?.contexts?.nodes);
+  const { preview } = config;
   const pr: Pr = {
     number: raw.number,
     title: raw.title,
@@ -175,9 +176,10 @@ async function readPr(run: Run, readText: ReadText): Promise<PrSnapshot> {
     reviewDecision: raw.reviewDecision ?? '',
     checks,
     threads: parseThreads(raw.reviewThreads?.nodes ?? []),
+    head: commit?.oid ?? '',
     preview:
-      checks.some(check => check.name === config.preview?.check) ?
-        config.preview?.url.replace('{number}', String(raw.number))
+      preview && checks.some(check => check.name === preview.check) ?
+        preview.url.replace('{number}', String(raw.number))
       : undefined,
   };
   return { kind: 'pr', pr, land: config.land ?? [] };
@@ -188,13 +190,14 @@ async function readConfig(
   readText: ReadText,
   path: string,
 ): Promise<RepoConfig> {
-  let raw: any;
+  let raw: unknown;
   try {
     raw = JSON.parse(await readText(path));
   } catch {
     return {};
   }
-  const { preview, land } = raw ?? {};
+  if (typeof raw !== 'object' || raw === null) return {};
+  const { preview, land } = raw as { preview?: any; land?: unknown };
   return {
     preview:
       typeof preview?.check === 'string' && typeof preview?.url === 'string' ?

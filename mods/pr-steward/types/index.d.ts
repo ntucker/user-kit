@@ -14,6 +14,8 @@ export type Pr = {
   title: string;
   url: string;
   isDraft: boolean;
+  /** The head commit's SHA */
+  head: string;
   /** CLEAN, BLOCKED, BEHIND, DIRTY (conflicts), UNSTABLE, ... */
   mergeState: string;
   reviewDecision: string;

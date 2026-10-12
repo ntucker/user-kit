@@ -16,7 +16,9 @@ const snapshotRef = { plugin: 'pr-steward', key: 'snapshot' } as const;
 const POLL_MS = 60_000;
 /** CI needs a moment to register a push's checks */
 const AFTER_PUSH_MS = 15_000;
-const PUSHES = /\bgit\b[^;&|]*\bpush\b|\bgh\s+pr\s+(create|ready)\b/;
+/** Commands after which the branch's PR may have changed */
+const PUSHES =
+  /\bgit\b[^;&|]*\b(push|checkout|switch)\b|\bgh\s+pr\s+(create|ready|checkout)\b/;
 
 let latest: Promise<PrSnapshot> | undefined;
 
@@ -222,10 +224,11 @@ function announce(
 ) {
   if (previous?.kind !== 'pr' || next.kind !== 'pr') return;
   if (previous.pr.number !== next.pr.number) return;
+  // only the same commit's run settling; a new push's checks are still arriving
   const wasRunning = byState(previous.pr, 'pending').length > 0;
   const isRunning = byState(next.pr, 'pending').length > 0;
   const failing = byState(next.pr, 'fail');
-  if (wasRunning && !isRunning && next.pr.checks.length)
+  if (previous.pr.head === next.pr.head && wasRunning && !isRunning)
     $.ui.toast(
       failing.length ?
         `PR #${next.pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
