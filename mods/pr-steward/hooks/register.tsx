@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code';
 
-import type { Pr, PrSnapshot } from '../types';
+import type { PrSnapshot } from '../types';
 import {
   byState,
   fetchSnapshot,
@@ -216,9 +216,8 @@ export const register: Register = on => {
   });
 };
 
-/** No checks yet counts as running: they have not reported */
-const isRunning = (pr: Pr) =>
-  !pr.checks.length || byState(pr, 'pending').length > 0;
+/** The commit whose checks were last seen running; announced once they all report */
+let runningHead: string | undefined;
 
 /** A toast when CI settles or the PR starts conflicting, so nobody has to poll */
 function announce(
@@ -226,20 +225,24 @@ function announce(
   previous: PrSnapshot | null,
   next: PrSnapshot,
 ) {
-  if (previous?.kind !== 'pr' || next.kind !== 'pr') return;
-  if (previous.pr.number !== next.pr.number) return;
-  // only the same commit's run settling; a new push's checks are still arriving
-  const failing = byState(next.pr, 'fail');
-  if (
-    previous.pr.head === next.pr.head &&
-    isRunning(previous.pr) &&
-    !isRunning(next.pr)
-  )
+  if (next.kind !== 'pr') return;
+  const { pr } = next;
+  // a read with no checks says nothing; one that settles another commit is a new push
+  if (byState(pr, 'pending').length) runningHead = pr.head;
+  else if (pr.checks.length && pr.head === runningHead) {
+    runningHead = undefined;
+    const failing = byState(pr, 'fail');
     $.ui.toast(
       failing.length ?
-        `PR #${next.pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
-      : `PR #${next.pr.number}: CI green`,
+        `PR #${pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
+      : `PR #${pr.number}: CI green`,
     );
-  if (!isConflicted(previous.pr) && isConflicted(next.pr))
-    $.ui.toast(`PR #${next.pr.number} now conflicts with its base branch`);
+  }
+  if (
+    previous?.kind === 'pr' &&
+    previous.pr.number === pr.number &&
+    !isConflicted(previous.pr) &&
+    isConflicted(pr)
+  )
+    $.ui.toast(`PR #${pr.number} now conflicts with its base branch`);
 }

@@ -325,7 +325,10 @@ describe('toasts', () => {
       return { value: undefined };
     });
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
-    for (pr of reads) await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    for (const read of reads) {
+      pr = read;
+      await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    }
     return toasts;
   }
 
@@ -335,14 +338,21 @@ describe('toasts', () => {
     ]);
   });
 
+  const empty = {
+    ...PR,
+    commits: { nodes: [{ commit: { oid: 'aaa', statusCheckRollup: null } }] },
+  };
+
   test('waits out a read with no checks', async ($, on) => {
-    const empty = {
-      ...PR,
-      commits: { nodes: [{ commit: { oid: 'aaa', statusCheckRollup: null } }] },
-    };
     expect(await toastsAfter($, on, empty, settled('aaa'))).toEqual([
       'PR #4300: 1 failing (ci/circleci: lint)',
     ]);
+  });
+
+  test('says it once per commit', async ($, on) => {
+    expect(
+      await toastsAfter($, on, settled('aaa'), empty, settled('aaa')),
+    ).toEqual(['PR #4300: 1 failing (ci/circleci: lint)']);
   });
 
   test("stays quiet while a new push's checks arrive", async ($, on) => {
