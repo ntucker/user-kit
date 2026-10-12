@@ -79,7 +79,7 @@ export const register: Register = on => {
       $.tool.register({
         name: 'pr_status',
         description:
-          "Current state of this branch's pull request, read fresh from GitHub: merge state, failing and running checks (CircleCI, GitHub Actions, Claude Approvals) with links, unresolved review threads with their first line and link, and the website preview link. Use it instead of re-querying GitHub when checking whether a PR is ready.",
+          "Current state of this branch's pull request, read fresh from GitHub: merge state, failing and running checks with links, unresolved review threads with their first line and link, and the preview link when the repo configures one. Use it instead of re-querying GitHub when checking whether a PR is ready.",
         isDeferred: false,
       }),
     ]);
@@ -216,9 +216,8 @@ export const register: Register = on => {
   });
 };
 
-/** The commit whose checks have not all reported, and the last one announced */
-let running: string | undefined;
-let announced: string | undefined;
+/** Each commit's CI as last seen, so each run's result is announced once */
+const ci = new Map<string, 'running' | 'settled'>();
 
 /** A toast when CI settles or the PR starts conflicting, so nobody has to poll */
 function announce(
@@ -228,20 +227,20 @@ function announce(
 ) {
   if (next.kind !== 'pr') return;
   const { pr } = next;
-  // a commit first seen settled stays quiet; a re-run is announced again,
-  // but an empty read after the announcement is only GitHub catching up
-  if (byState(pr, 'pending').length) running = pr.head;
-  else if (!pr.checks.length) {
-    if (pr.head !== announced) running = pr.head;
-  } else if (pr.head === running) {
-    running = undefined;
-    announced = pr.head;
+  // a commit first seen settled stays quiet; a re-run is announced again, but
+  // an empty read of a commit already seen is only GitHub catching up
+  const seen = ci.get(pr.head);
+  if (byState(pr, 'pending').length || (!pr.checks.length && !seen))
+    ci.set(pr.head, 'running');
+  else if (pr.checks.length) {
+    ci.set(pr.head, 'settled');
     const failing = byState(pr, 'fail');
-    $.ui.toast(
-      failing.length ?
-        `PR #${pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
-      : `PR #${pr.number}: CI green`,
-    );
+    if (seen === 'running')
+      $.ui.toast(
+        failing.length ?
+          `PR #${pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
+        : `PR #${pr.number}: CI green`,
+      );
   }
   if (
     previous?.kind === 'pr' &&

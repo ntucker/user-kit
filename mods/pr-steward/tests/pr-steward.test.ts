@@ -380,6 +380,16 @@ describe('toasts', () => {
     ]);
   });
 
+  test('stays quiet for a commit first seen settled', async ($, on) => {
+    const bbbEmpty = {
+      ...PR,
+      commits: { nodes: [{ commit: { oid: 'bbb', statusCheckRollup: null } }] },
+    };
+    expect(
+      await toastsAfter($, on, settled('bbb'), bbbEmpty, settled('bbb')),
+    ).toEqual([]);
+  });
+
   test('says it once per commit', async ($, on) => {
     expect(
       await toastsAfter($, on, settled('aaa'), empty, settled('aaa')),
