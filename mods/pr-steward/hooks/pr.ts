@@ -197,7 +197,10 @@ async function readConfig(
     return {};
   }
   if (typeof raw !== 'object' || raw === null) return {};
-  const { preview, land } = raw as { preview?: any; land?: unknown };
+  const { preview, land } = raw as {
+    preview?: { check?: unknown; url?: unknown };
+    land?: unknown;
+  };
   return {
     preview:
       typeof preview?.check === 'string' && typeof preview?.url === 'string' ?

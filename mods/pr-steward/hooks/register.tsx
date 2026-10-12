@@ -16,8 +16,8 @@ const snapshotRef = { plugin: 'pr-steward', key: 'snapshot' } as const;
 const POLL_MS = 60_000;
 /** CI needs a moment to register a push's checks */
 const AFTER_PUSH_MS = 15_000;
-/** Commands after which the branch's PR may have changed */
-const PUSHES =
+/** git push/checkout/switch and gh pr create/ready/checkout: the branch's PR may have changed */
+const BRANCH_CHANGES =
   /\bgit\b[^;&|]*\b(push|checkout|switch)\b|\bgh\s+pr\s+(create|ready|checkout)\b/;
 
 let latest: Promise<PrSnapshot> | undefined;
@@ -105,7 +105,7 @@ export const register: Register = on => {
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
-    if (PUSHES.test(e.command))
+    if (BRANCH_CHANGES.test(e.command))
       $.clock.after(AFTER_PUSH_MS, () => void refresh($));
     return ran;
   }).catch(($, e, next) => next(e));
@@ -228,7 +228,12 @@ function announce(
   const wasRunning = byState(previous.pr, 'pending').length > 0;
   const isRunning = byState(next.pr, 'pending').length > 0;
   const failing = byState(next.pr, 'fail');
-  if (previous.pr.head === next.pr.head && wasRunning && !isRunning)
+  if (
+    previous.pr.head === next.pr.head &&
+    wasRunning &&
+    !isRunning &&
+    next.pr.checks.length
+  )
     $.ui.toast(
       failing.length ?
         `PR #${next.pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
