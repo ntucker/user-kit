@@ -14,8 +14,7 @@
     },
     {
       "name": "pr-steward",
-      "source": "./mods/pr-steward",
-      "description": "Claude Code mod: keeps the current branch's PR (CI, review threads, conflicts, preview) in a pane and status line, with /land and a pr_status tool"
+      "source": "./mods/pr-steward"
     }
   ]
 }

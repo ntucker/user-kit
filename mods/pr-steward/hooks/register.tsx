@@ -45,8 +45,21 @@ async function markReady($: EngineInterface) {
   await refresh($);
 }
 
-async function land($: EngineInterface) {
-  await $.prompt.submit({ text: landPrompt(await refresh($)) });
+/** Asks the model to land the PR; without one, says why not */
+async function land($: EngineInterface): Promise<string> {
+  const snapshot = await refresh($);
+  if (snapshot.kind !== 'pr') return summary(snapshot);
+  await $.prompt.submit({ text: landPrompt(snapshot) });
+  return 'Landing this branch’s pull request.';
+}
+
+let ticks = 0;
+
+/** Every minute while the branch has a PR; every fifth minute otherwise */
+async function poll($: EngineInterface) {
+  ticks += 1;
+  const snapshot = (await $.state.get(snapshotRef)).value;
+  if (snapshot?.kind === 'pr' || ticks % 5 === 0) await refresh($);
 }
 
 export const register: Register = on => {
@@ -68,7 +81,7 @@ export const register: Register = on => {
         isDeferred: false,
       }),
     ]);
-    $.clock.every(POLL_MS, () => void refresh($));
+    $.clock.every(POLL_MS, () => void poll($));
     void refresh($);
     return next(e);
   });
@@ -80,8 +93,7 @@ export const register: Register = on => {
   });
 
   on('command.run', { command: 'land' }, async $ => {
-    await land($);
-    return { text: 'Landing this branch’s pull request.' };
+    return { text: await land($) };
   });
 
   on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => ({
@@ -213,7 +225,7 @@ function announce(
   const wasRunning = byState(previous.pr, 'pending').length > 0;
   const isRunning = byState(next.pr, 'pending').length > 0;
   const failing = byState(next.pr, 'fail');
-  if (wasRunning && !isRunning)
+  if (wasRunning && !isRunning && next.pr.checks.length)
     $.ui.toast(
       failing.length ?
         `PR #${next.pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`

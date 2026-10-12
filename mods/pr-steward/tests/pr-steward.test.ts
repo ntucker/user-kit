@@ -83,15 +83,20 @@ const exited = (exitCode: number, stdout: string, stderr = '') => ({
 
 /** git and gh as they answer on a branch whose open PR is `pr` (none when null) */
 const ghRun =
-  (pr: unknown = PR, failure?: ReturnType<typeof exited>): Run =>
+  (
+    pr: unknown = PR,
+    failure?: ReturnType<typeof exited>,
+    branch = 'faster-search',
+  ): Run =>
   async argv => {
-    if (argv[0] === 'git') return exited(0, '/repo\nfaster-search\n');
+    if (argv[0] === 'git') return exited(0, `/repo\n${branch}\n`);
     if (failure) return failure;
     const nodes = pr === null ? [] : [pr];
-    return exited(
-      0,
-      JSON.stringify({ data: { repository: { pullRequests: { nodes } } } }),
-    );
+    const repository = {
+      defaultBranchRef: { name: 'main' },
+      pullRequests: { nodes },
+    };
+    return exited(0, JSON.stringify({ data: { repository } }));
   };
 
 const readConfig = async (path: string) => {
@@ -127,7 +132,7 @@ const PANE = {
 } as const;
 
 describe('checks', () => {
-  test('sorts CircleCI statuses and check runs into states', async () => {
+  test('maps CircleCI statuses and check runs to states', async () => {
     expect(parseChecks(ROLLUP).map(c => c.state)).toEqual([
       'fail',
       'pending',
@@ -198,7 +203,9 @@ describe('pane', () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain('Land this pull request');
     expect(prompts[0]).toContain('FAILING ci/circleci: lint');
-    expect(prompts[0]).toContain('4. Run /simplify on the change.');
+    expect(prompts[0]).toContain(
+      '4. (from .claude/pr-steward.json) Run /simplify on the change.',
+    );
     expect(prompts[0]).toContain('5. Mark the PR ready');
   });
 });
@@ -240,4 +247,44 @@ describe('failures', () => {
     expect(snapshot.kind === 'pr' && snapshot.pr.preview).toBeUndefined();
     expect(snapshot.kind === 'pr' && snapshot.land).toEqual([]);
   });
+
+  test('malformed config costs only the parts it breaks', async () => {
+    const read = (config: unknown) =>
+      fetchSnapshot(ghRun(), async () =>
+        typeof config === 'string' ? config : JSON.stringify(config),
+      );
+    const broken = await read('{ not json');
+    expect(broken.kind).toBe('pr');
+    const shapes = await read({
+      preview: { check: 'docs deploy' },
+      land: 'one step',
+    });
+    expect(shapes.kind === 'pr' && shapes.pr.preview).toBeUndefined();
+    expect(shapes.kind === 'pr' && shapes.land).toEqual([]);
+  });
+
+  test('the default branch never matches a fork PR of the same name', async () => {
+    const snapshot = await fetchSnapshot(
+      ghRun(PR, undefined, 'main'),
+      readConfig,
+    );
+    expect(snapshot).toEqual({ kind: 'none', branch: 'main' });
+  });
+});
+
+test('/land without a PR says so and submits nothing', async ($, on) => {
+  fakeHost(on, ghRun(null));
+  const prompts: string[] = [];
+  on('prompt.submit', ($, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  const ran = await $.command.run({
+    command: 'land',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  });
+  expect(ran.text).toBe('No pull request is open for branch faster-search.');
+  expect(prompts).toHaveLength(0);
 });

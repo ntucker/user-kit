@@ -3,7 +3,7 @@
 Keeps the current branch's pull request in view while you work in Claude Code.
 
 - **Pane** (`/pr`): merge state and conflicts, failing and running checks (CircleCI, GitHub Actions, Claude Approvals) with links, unresolved review threads, and the repository's preview link once its deploy check exists. Buttons: Refresh, Land, Mark ready (drafts).
-- **Status line**: `PR #123 · 2 failing · 3 open threads`, refreshed every minute and shortly after each `git push`.
+- **Status line**: `PR #123 · 2 failing · 3 open threads`, refreshed every minute while the branch has a PR (every five otherwise) and shortly after each `git push`.
 - **Toasts** when CI settles (green or which checks failed) and when the PR starts conflicting.
 - **`/land`**: asks Claude to drive the PR to mergeable: conflicts, then failing checks, then review threads (verifying each claim against the code), then the repository's own steps and marking it ready.
 - **`pr_status` tool**: Claude reads the same state instead of re-querying GitHub.
