@@ -216,8 +216,9 @@ export const register: Register = on => {
   });
 };
 
-/** The commit whose checks were last seen running; announced once they all report */
-let runningHead: string | undefined;
+/** The commit whose checks have not all reported, and the last one announced */
+let running: string | undefined;
+let announced: string | undefined;
 
 /** A toast when CI settles or the PR starts conflicting, so nobody has to poll */
 function announce(
@@ -227,10 +228,14 @@ function announce(
 ) {
   if (next.kind !== 'pr') return;
   const { pr } = next;
-  // a read with no checks says nothing; one that settles another commit is a new push
-  if (byState(pr, 'pending').length) runningHead = pr.head;
-  else if (pr.checks.length && pr.head === runningHead) {
-    runningHead = undefined;
+  // a commit first seen settled stays quiet; a re-run is announced again,
+  // but an empty read after the announcement is only GitHub catching up
+  if (byState(pr, 'pending').length) running = pr.head;
+  else if (!pr.checks.length) {
+    if (pr.head !== announced) running = pr.head;
+  } else if (pr.head === running) {
+    running = undefined;
+    announced = pr.head;
     const failing = byState(pr, 'fail');
     $.ui.toast(
       failing.length ?

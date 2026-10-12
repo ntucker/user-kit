@@ -315,7 +315,7 @@ describe('toasts', () => {
     },
   });
 
-  /** Reads PR, then each of `reads`, collecting the toasts they raised */
+  /** Reads PR (checks running on aaa), then each of `reads`, collecting the toasts they raised */
   async function toastsAfter($: any, on: On, ...reads: unknown[]) {
     let pr: unknown = PR;
     fakeHost(on, async argv => ghRun(pr)(argv));
@@ -345,6 +345,37 @@ describe('toasts', () => {
 
   test('waits out a read with no checks', async ($, on) => {
     expect(await toastsAfter($, on, empty, settled('aaa'))).toEqual([
+      'PR #4300: 1 failing (ci/circleci: lint)',
+    ]);
+  });
+
+  test('says when checks go from none to settled', async ($, on) => {
+    expect(
+      await toastsAfter(
+        $,
+        on,
+        {
+          ...empty,
+          commits: {
+            nodes: [{ commit: { oid: 'bbb', statusCheckRollup: null } }],
+          },
+        },
+        settled('bbb'),
+      ),
+    ).toEqual(['PR #4300: 1 failing (ci/circleci: lint)']);
+  });
+
+  test('says when the PR starts conflicting', async ($, on) => {
+    expect(
+      await toastsAfter($, on, { ...PR, mergeStateStatus: 'CLEAN' }, PR),
+    ).toEqual(['PR #4300 now conflicts with its base branch']);
+  });
+
+  test('says it again after a re-run', async ($, on) => {
+    expect(
+      await toastsAfter($, on, settled('aaa'), PR, settled('aaa')),
+    ).toEqual([
+      'PR #4300: 1 failing (ci/circleci: lint)',
       'PR #4300: 1 failing (ci/circleci: lint)',
     ]);
   });
