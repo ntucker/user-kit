@@ -315,8 +315,8 @@ describe('toasts', () => {
     },
   });
 
-  /** Reads PR, then `then`, collecting the toasts the second read raised */
-  async function toastsAfter($: any, on: On, then: unknown) {
+  /** Reads PR, then each of `reads`, collecting the toasts they raised */
+  async function toastsAfter($: any, on: On, ...reads: unknown[]) {
     let pr: unknown = PR;
     fakeHost(on, async argv => ghRun(pr)(argv));
     const toasts: string[] = [];
@@ -325,13 +325,22 @@ describe('toasts', () => {
       return { value: undefined };
     });
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
-    pr = then;
-    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    for (pr of reads) await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
     return toasts;
   }
 
   test("says when the same commit's CI settles", async ($, on) => {
     expect(await toastsAfter($, on, settled('aaa'))).toEqual([
+      'PR #4300: 1 failing (ci/circleci: lint)',
+    ]);
+  });
+
+  test('waits out a read with no checks', async ($, on) => {
+    const empty = {
+      ...PR,
+      commits: { nodes: [{ commit: { oid: 'aaa', statusCheckRollup: null } }] },
+    };
+    expect(await toastsAfter($, on, empty, settled('aaa'))).toEqual([
       'PR #4300: 1 failing (ci/circleci: lint)',
     ]);
   });

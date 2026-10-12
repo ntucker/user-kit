@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code';
 
-import type { PrSnapshot } from '../types';
+import type { Pr, PrSnapshot } from '../types';
 import {
   byState,
   fetchSnapshot,
@@ -216,6 +216,10 @@ export const register: Register = on => {
   });
 };
 
+/** No checks yet counts as running: they have not reported */
+const isRunning = (pr: Pr) =>
+  !pr.checks.length || byState(pr, 'pending').length > 0;
+
 /** A toast when CI settles or the PR starts conflicting, so nobody has to poll */
 function announce(
   $: EngineInterface,
@@ -225,14 +229,11 @@ function announce(
   if (previous?.kind !== 'pr' || next.kind !== 'pr') return;
   if (previous.pr.number !== next.pr.number) return;
   // only the same commit's run settling; a new push's checks are still arriving
-  const wasRunning = byState(previous.pr, 'pending').length > 0;
-  const isRunning = byState(next.pr, 'pending').length > 0;
   const failing = byState(next.pr, 'fail');
   if (
     previous.pr.head === next.pr.head &&
-    wasRunning &&
-    !isRunning &&
-    next.pr.checks.length
+    isRunning(previous.pr) &&
+    !isRunning(next.pr)
   )
     $.ui.toast(
       failing.length ?
