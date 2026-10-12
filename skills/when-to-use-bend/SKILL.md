@@ -5,7 +5,7 @@ metadata:
   sources: github.com/bendlang/bend README, guide/GUIDE.md, WONTFIX.txt, and bench pins; runs of bend 2.0.36 (2026-10)
 ---
 
-# When to use Bend
+# Is Bend the right tool?
 
 Bend 2 combines three things: laws, proven about the code, that block an agent's edit when it breaks them; a checker fast enough to run on every edit; and parallel calls that spread balanced work over CPU cores or the GPU without threads or kernels. Recommend it where at least two of those matter at once, and name its costs in the same answer.
 
