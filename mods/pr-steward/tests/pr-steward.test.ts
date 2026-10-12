@@ -338,10 +338,12 @@ describe('toasts', () => {
     ]);
   });
 
-  const empty = {
+  /** A read of `oid` before GitHub reports any checks */
+  const unreported = (oid: string) => ({
     ...PR,
-    commits: { nodes: [{ commit: { oid: 'aaa', statusCheckRollup: null } }] },
-  };
+    commits: { nodes: [{ commit: { oid, statusCheckRollup: null } }] },
+  });
+  const empty = unreported('aaa');
 
   test('waits out a read with no checks', async ($, on) => {
     expect(await toastsAfter($, on, empty, settled('aaa'))).toEqual([
@@ -350,19 +352,9 @@ describe('toasts', () => {
   });
 
   test('says when checks go from none to settled', async ($, on) => {
-    expect(
-      await toastsAfter(
-        $,
-        on,
-        {
-          ...empty,
-          commits: {
-            nodes: [{ commit: { oid: 'bbb', statusCheckRollup: null } }],
-          },
-        },
-        settled('bbb'),
-      ),
-    ).toEqual(['PR #4300: 1 failing (ci/circleci: lint)']);
+    expect(await toastsAfter($, on, unreported('bbb'), settled('bbb'))).toEqual(
+      ['PR #4300: 1 failing (ci/circleci: lint)'],
+    );
   });
 
   test('says when the PR starts conflicting', async ($, on) => {
@@ -380,13 +372,16 @@ describe('toasts', () => {
     ]);
   });
 
+  // the commit's state outlives a test, so this one is new to every test
   test('stays quiet for a commit first seen settled', async ($, on) => {
-    const bbbEmpty = {
-      ...PR,
-      commits: { nodes: [{ commit: { oid: 'bbb', statusCheckRollup: null } }] },
-    };
     expect(
-      await toastsAfter($, on, settled('bbb'), bbbEmpty, settled('bbb')),
+      await toastsAfter(
+        $,
+        on,
+        settled('ccc'),
+        unreported('ccc'),
+        settled('ccc'),
+      ),
     ).toEqual([]);
   });
 
