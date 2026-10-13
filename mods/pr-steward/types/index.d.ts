@@ -19,6 +19,8 @@ export type Pr = {
   /** CLEAN, BLOCKED, BEHIND, DIRTY (conflicts), UNSTABLE, ... */
   mergeState: string;
   reviewDecision: string;
+  /** GitHub's overall CI state, which also counts checks past the listed ones */
+  ci: 'pass' | 'fail' | 'pending' | 'none';
   checks: Check[];
   threads: Thread[];
   /** Vercel docs preview, when the PR changes the website or docs */

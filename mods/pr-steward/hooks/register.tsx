@@ -3,6 +3,7 @@ import type { EngineInterface, Register, Timer } from 'claude-code';
 import type { PrSnapshot } from '../types';
 import {
   byState,
+  ciText,
   fetchSnapshot,
   headline,
   isConflicted,
@@ -53,6 +54,16 @@ async function land($: EngineInterface): Promise<string> {
 }
 
 let afterPush: Timer | undefined;
+let branch: string | undefined;
+
+/** Refreshes at once when Claude switched branches, so the pane never shows the old branch's PR */
+async function checkBranch($: EngineInterface) {
+  const ran = await $.process.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
+  const now = ran.stdout.trim();
+  const switched = branch !== undefined && now !== branch;
+  branch = now;
+  if (switched) await refresh($);
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -75,6 +86,7 @@ export const register: Register = on => {
     ]);
     $.clock.every(POLL_MS, () => void refresh($));
     void refresh($);
+    void checkBranch($).catch(() => undefined);
     return next(e);
   });
 
@@ -95,6 +107,7 @@ export const register: Register = on => {
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
+    void checkBranch($).catch(() => undefined);
     const git = ran.isError ? undefined : ran.result?.gitOperation;
     if (git?.push || git?.pr) {
       afterPush?.cancel();
@@ -187,9 +200,9 @@ export const register: Register = on => {
             </Text>
           ))}
           {failing.length + pending.length === 0 &&
-            (pr.checks.length ?
+            (pr.ci === 'pass' ?
               <Text color="success">✓ All checks pass</Text>
-            : <Text dimColor>No checks yet</Text>)}
+            : <Text dimColor>{ciText(pr)}</Text>)}
         </Box>
 
         <Box flexDirection="column">
@@ -210,7 +223,7 @@ export const register: Register = on => {
 };
 
 /** Each commit's CI as last seen, so each run's result is announced once */
-const ci = new Map<string, 'running' | 'settled'>();
+const runs = new Map<string, 'running' | 'settled'>();
 
 /** A toast when CI settles or the PR starts conflicting, so nobody has to poll */
 function announce(
@@ -222,17 +235,17 @@ function announce(
   const { pr } = next;
   // a commit first seen settled stays quiet; a re-run is announced again, but
   // an empty read of a commit already seen is only GitHub catching up
-  const seen = ci.get(pr.head);
-  if (byState(pr, 'pending').length || (!pr.checks.length && !seen))
-    ci.set(pr.head, 'running');
-  else if (pr.checks.length) {
-    ci.set(pr.head, 'settled');
+  const seen = runs.get(pr.head);
+  if (pr.ci === 'pending' || (pr.ci === 'none' && !seen))
+    runs.set(pr.head, 'running');
+  else if (pr.ci !== 'none') {
+    runs.set(pr.head, 'settled');
     const failing = byState(pr, 'fail');
     if (seen === 'running')
       $.ui.toast(
         failing.length ?
           `PR #${pr.number}: ${failing.length} failing (${failing.map(c => c.name).join(', ')})`
-        : `PR #${pr.number}: CI green`,
+        : `PR #${pr.number}: ${ciText(pr)}`,
       );
   }
   if (

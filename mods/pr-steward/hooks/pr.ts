@@ -21,15 +21,16 @@ const CONFIG_PATH = '.claude/pr-steward.json';
 const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef { name }
-    pullRequests(headRefName: $branch, states: OPEN, first: 1) {
+    pullRequests(headRefName: $branch, states: OPEN, first: 5) {
       nodes {
         number
         title
         url
         isDraft
+        isCrossRepository
         mergeStateStatus
         reviewDecision
-        reviewThreads(first: 100) {
+        reviewThreads(last: 100) {
           nodes {
             isResolved
             path
@@ -41,6 +42,7 @@ const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
             commit {
               oid
               statusCheckRollup {
+                state
                 contexts(first: 100) {
                   nodes {
                     ... on CheckRun { name status conclusion detailsUrl }
@@ -65,6 +67,12 @@ type RollupItem = {
   detailsUrl?: string;
   targetUrl?: string;
 };
+
+function rollupState(state: string | undefined): Pr['ci'] {
+  if (state === 'SUCCESS') return 'pass';
+  if (state === 'FAILURE' || state === 'ERROR') return 'fail';
+  return state ? 'pending' : 'none';
+}
 
 function checkState(item: RollupItem): CheckState {
   // StatusContext (CircleCI) has `state`; CheckRun (Actions, apps) has status + conclusion
@@ -155,15 +163,18 @@ async function readPr(run: Run, readText: ReadText): Promise<PrSnapshot> {
   if (result.exitCode !== 0)
     return { kind: 'error', message: result.stderr.trim() || 'gh api failed' };
   const repository = JSON.parse(result.stdout).data?.repository;
-  // a fork's PR from its own `main` would otherwise match the default branch
+  // forks' PRs can share the branch's name: prefer this repo's own, and never
+  // match a fork's PR from its `main` while on the default branch
+  const nodes: any[] = repository?.pullRequests?.nodes ?? [];
   const raw =
     branch === repository?.defaultBranchRef?.name ?
       undefined
-    : repository?.pullRequests?.nodes?.[0];
+    : (nodes.find(node => !node.isCrossRepository) ?? nodes[0]);
   if (!raw) return { kind: 'none', branch };
   const config = await readConfig(readText, `${root}/${CONFIG_PATH}`);
   const commit = raw.commits?.nodes?.[0]?.commit;
-  const checks = parseChecks(commit?.statusCheckRollup?.contexts?.nodes);
+  const rollup = commit?.statusCheckRollup;
+  const checks = parseChecks(rollup?.contexts?.nodes);
   const { preview } = config;
   const pr: Pr = {
     number: raw.number,
@@ -172,6 +183,7 @@ async function readPr(run: Run, readText: ReadText): Promise<PrSnapshot> {
     isDraft: raw.isDraft,
     mergeState: raw.mergeStateStatus ?? 'UNKNOWN',
     reviewDecision: raw.reviewDecision ?? '',
+    ci: rollupState(rollup?.state),
     checks,
     threads: parseThreads(raw.reviewThreads?.nodes ?? []),
     head: commit?.oid ?? '',
@@ -216,16 +228,20 @@ export const byState = (pr: Pr, state: CheckState) =>
 
 export const isConflicted = (pr: Pr) => pr.mergeState === 'DIRTY';
 
+/** CI in a few words; GitHub's overall state decides, the listed checks give the count */
+export function ciText(pr: Pr): string {
+  const failing = byState(pr, 'fail').length;
+  const pending = byState(pr, 'pending').length;
+  if (pr.ci === 'fail') return failing ? `${failing} failing` : 'CI failing';
+  if (pr.ci === 'pending') return pending ? `${pending} running` : 'CI running';
+  return pr.ci === 'pass' ? 'CI green' : 'no checks yet';
+}
+
 /** One line for the status bar */
 export function headline(pr: Pr): string {
   const parts = [`PR #${pr.number}`];
   if (isConflicted(pr)) parts.push('conflicts');
-  const failing = byState(pr, 'fail').length;
-  const pending = byState(pr, 'pending').length;
-  if (failing) parts.push(`${failing} failing`);
-  else if (pending) parts.push(`${pending} running`);
-  else if (pr.checks.length) parts.push('CI green');
-  else parts.push('no checks yet');
+  parts.push(ciText(pr));
   if (pr.threads.length)
     parts.push(
       `${pr.threads.length} open thread${pr.threads.length === 1 ? '' : 's'}`,
@@ -251,7 +267,7 @@ export function summary(snapshot: PrSnapshot): string {
   const failing = byState(pr, 'fail');
   const pending = byState(pr, 'pending');
   lines.push(
-    `Checks: ${failing.length} failing, ${pending.length} running, ${byState(pr, 'pass').length} passing`,
+    `Checks (${ciText(pr)}): ${failing.length} failing, ${pending.length} running, ${byState(pr, 'pass').length} passing`,
   );
   for (const check of failing)
     lines.push(`- FAILING ${check.name}${check.url ? ` ${check.url}` : ''}`);

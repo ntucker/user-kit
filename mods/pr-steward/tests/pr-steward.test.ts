@@ -2,7 +2,7 @@ import type { On } from 'claude-code';
 import { describe, expect, mock, test } from 'claude-code/testing';
 
 import type { Run } from '../hooks/pr';
-import { fetchSnapshot, parseChecks, summary } from '../hooks/pr';
+import { fetchSnapshot, headline, parseChecks, summary } from '../hooks/pr';
 
 const ROLLUP = [
   {
@@ -63,7 +63,7 @@ const PR = {
       {
         commit: {
           oid: 'aaa',
-          statusCheckRollup: { contexts: { nodes: ROLLUP } },
+          statusCheckRollup: { state: 'PENDING', contexts: { nodes: ROLLUP } },
         },
       },
     ],
@@ -71,14 +71,21 @@ const PR = {
 };
 
 /** PR with `oid` as its head; `contexts` null before GitHub reports any checks */
-const onCommit = (oid: string, contexts: unknown[] | null) => ({
+const onCommit = (
+  oid: string,
+  contexts: unknown[] | null,
+  state = 'PENDING',
+) => ({
   ...PR,
   commits: {
     nodes: [
       {
         commit: {
           oid,
-          statusCheckRollup: contexts && { contexts: { nodes: contexts } },
+          statusCheckRollup: contexts && {
+            state,
+            contexts: { nodes: contexts },
+          },
         },
       },
     ],
@@ -99,7 +106,7 @@ const exited = (exitCode: number, stdout: string, stderr = '') => ({
   stderr,
 });
 
-/** git and gh as they answer on a branch whose open PR is `pr` (none when null) */
+/** git and gh as they answer on a branch whose open PR is `pr` (none when null; several when an array) */
 const ghRun =
   (
     pr: unknown = PR,
@@ -107,9 +114,16 @@ const ghRun =
     branch = 'faster-search',
   ): Run =>
   async argv => {
-    if (argv[0] === 'git') return exited(0, `/repo\n${branch}\n`);
+    if (argv[0] === 'git')
+      return exited(
+        0,
+        argv.includes('--show-toplevel') ? `/repo\n${branch}\n` : `${branch}\n`,
+      );
     if (failure) return failure;
-    const nodes = pr === null ? [] : [pr];
+    const nodes =
+      pr === null ? []
+      : Array.isArray(pr) ? pr
+      : [pr];
     const repository = {
       defaultBranchRef: { name: 'main' },
       pullRequests: { nodes },
@@ -122,7 +136,6 @@ const readConfig = async (path: string) => {
   throw new Error('ENOENT');
 };
 
-/** Answers the plugin's process and file reads as ghRun and readConfig do */
 /** The prompts the mod submits, in order */
 function capturePrompts(on: On) {
   const prompts: string[] = [];
@@ -133,6 +146,7 @@ function capturePrompts(on: On) {
   return prompts;
 }
 
+/** Answers the plugin's process and file reads as ghRun and readConfig do */
 function fakeHost(on: On, run: Run = ghRun()) {
   mock.clock(on);
   on('process.run', async ($, e) => ({
@@ -250,7 +264,7 @@ describe('failures', () => {
     );
     expect(snapshot.kind === 'pr' && snapshot.pr.checks).toEqual([]);
     expect(summary(snapshot)).toContain(
-      'Checks: 0 failing, 0 running, 0 passing',
+      'Checks (no checks yet): 0 failing, 0 running, 0 passing',
     );
   });
 
@@ -291,6 +305,24 @@ describe('failures', () => {
     );
     expect(snapshot).toEqual({ kind: 'none', branch: 'main' });
   });
+
+  test("a fork's PR from a branch of the same name loses to this repo's", async () => {
+    const fork = { ...PR, number: 9, isCrossRepository: true };
+    const snapshot = await fetchSnapshot(ghRun([fork, PR]), readConfig);
+    expect(snapshot.kind === 'pr' && snapshot.pr.number).toBe(4300);
+  });
+
+  test("GitHub's overall state wins over the listed checks", async () => {
+    const passing = ROLLUP.filter(c => c.conclusion === 'SUCCESS');
+    const read = (state: string) =>
+      fetchSnapshot(ghRun(onCommit('aaa', passing, state)), readConfig);
+    const running = await read('PENDING');
+    expect(running.kind === 'pr' && headline(running.pr)).toContain(
+      'CI running',
+    );
+    const failed = await read('FAILURE');
+    expect(failed.kind === 'pr' && headline(failed.pr)).toContain('CI failing');
+  });
 });
 
 test('/land without a PR says so and submits nothing', async ($, on) => {
@@ -311,6 +343,7 @@ describe('toasts', () => {
     onCommit(
       oid,
       ROLLUP.filter(c => c.status !== 'IN_PROGRESS'),
+      'FAILURE',
     );
 
   /** Reads PR (checks running on aaa), then each of `reads`, collecting the toasts they raised */
