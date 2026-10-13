@@ -148,7 +148,7 @@ function capturePrompts(on: On) {
 
 /** Answers the plugin's process and file reads as ghRun and readConfig do */
 function fakeHost(on: On, run: Run = ghRun()) {
-  mock.clock(on);
+  const clock = mock.clock(on);
   on('process.run', async ($, e) => ({
     value: {
       ...(await run(e.argv)),
@@ -157,6 +157,7 @@ function fakeHost(on: On, run: Run = ghRun()) {
     },
   }));
   on('fs.read', async ($, e) => ({ value: await readConfig(e.path) }));
+  return clock;
 }
 
 const PANE = {
@@ -425,5 +426,51 @@ describe('toasts', () => {
 
   test("stays quiet while a new push's checks arrive", async ($, on) => {
     expect(await toastsAfter($, on, settled('bbb'))).toEqual([]);
+  });
+});
+
+describe('refreshes', () => {
+  /** Runs one Bash command whose result reports `gitOperation`, on `branch` afterwards */
+  async function bash($: any, on: On, gitOperation?: object, branch?: string) {
+    const reads: string[] = [];
+    let current = 'faster-search';
+    const clock = fakeHost(on, async argv => {
+      if (argv[0] === 'gh') reads.push('gh');
+      return ghRun(PR, undefined, current)(argv);
+    });
+    let operation: object | undefined;
+    on('tool.call', { tool: 'Bash' }, () => ({
+      result: {
+        stdout: '',
+        stderr: '',
+        interrupted: false,
+        gitOperation: operation,
+      },
+    }));
+    // the first command learns the branch
+    await $.tool.call({ tool: 'Bash', command: 'true' });
+    await clock.advance(1);
+    reads.length = 0;
+    operation = gitOperation;
+    if (branch) current = branch;
+    await $.tool.call({ tool: 'Bash', command: 'x' });
+    await clock.advance(1);
+    const now = reads.length;
+    await clock.advance(15_000);
+    return [now, reads.length - now];
+  }
+
+  test('15s after a push', async ($, on) => {
+    expect(await bash($, on, { push: { branch: 'faster-search' } })).toEqual([
+      0, 1,
+    ]);
+  });
+
+  test('at once after a branch switch', async ($, on) => {
+    expect(await bash($, on, undefined, 'other')).toEqual([1, 0]);
+  });
+
+  test('not after other commands', async ($, on) => {
+    expect(await bash($, on)).toEqual([0, 0]);
   });
 });
