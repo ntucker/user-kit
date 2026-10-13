@@ -20,6 +20,8 @@ const POLL_MS = 60_000;
 const AFTER_PUSH_MS = 15_000;
 
 let latest: Promise<PrSnapshot> | undefined;
+/** Whether the branch last had a PR; a failed read only shows while tracking one, not in repos gh can't read at all */
+let tracking = false;
 
 /**
  * Reads the PR through gh; reads run one after another, so each caller sees
@@ -35,7 +37,8 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
       path => $.fs.read(path),
     );
     await $.state.set(snapshotRef, next);
-    $.ui.status(statusText(next));
+    if (next.kind !== 'error') tracking = next.kind === 'pr';
+    $.ui.status(tracking ? statusText(next) : undefined);
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({

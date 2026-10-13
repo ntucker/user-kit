@@ -328,14 +328,25 @@ describe('failures', () => {
   });
 });
 
-test('the status line shows a failed read', async ($, on) => {
-  fakeHost(on, ghRun(PR, exited(1, '', 'rate limited')));
+test('the status line shows a failed read only while tracking a PR', async ($, on) => {
+  let failure: ReturnType<typeof exited> | undefined = exited(
+    1,
+    '',
+    'no GitHub remote',
+  );
+  fakeHost(on, argv => ghRun(PR, failure)(argv));
   const lines: (string | undefined)[] = [];
   on('ui.status', ($, e) => {
     lines.push(e.text);
     return { value: undefined };
   });
-  await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+  const read = () => $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+  await read();
+  expect(lines.at(-1)).toBeUndefined();
+  failure = undefined;
+  await read();
+  failure = exited(1, '', 'rate limited\ntry later');
+  await read();
   expect(lines.at(-1)).toBe('PR read failed: rate limited');
 });
 
