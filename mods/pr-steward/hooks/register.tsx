@@ -38,10 +38,11 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     $.ui.status(next.kind === 'pr' ? headline(next.pr) : undefined);
     announce($, previous, next);
     return next;
-  })().catch((error): PrSnapshot => ({
-    kind: 'error',
-    message: String(error),
-  }));
+  })().catch((error): PrSnapshot => {
+    // a host call failed after the read; say so where the user looks
+    $.ui.status(`PR read failed: ${String(error)}`);
+    return { kind: 'error', message: String(error) };
+  });
   return latest;
 }
 
