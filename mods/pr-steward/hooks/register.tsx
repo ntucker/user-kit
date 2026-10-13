@@ -1,4 +1,4 @@
-import type { EngineInterface, Register } from 'claude-code';
+import type { EngineInterface, Register, Timer } from 'claude-code';
 
 import type { PrSnapshot } from '../types';
 import {
@@ -16,9 +16,6 @@ const snapshotRef = { plugin: 'pr-steward', key: 'snapshot' } as const;
 const POLL_MS = 60_000;
 /** CI needs a moment to register a push's checks */
 const AFTER_PUSH_MS = 15_000;
-/** git push/checkout/switch and gh pr create/ready/checkout: the branch's PR may have changed */
-const BRANCH_CHANGES =
-  /\bgit\b[^;&|]*\b(push|checkout|switch)\b|\bgh\s+pr\s+(create|ready|checkout)\b/;
 
 let latest: Promise<PrSnapshot> | undefined;
 
@@ -29,7 +26,7 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     await after;
     const previous = (await $.state.get(snapshotRef)).value ?? null;
     const next = await fetchSnapshot(
-      argv => $.process.run(argv, { timeoutMs: 30_000 }),
+      argv => $.process.run(argv),
       path => $.fs.read(path),
     );
     await $.state.set(snapshotRef, next);
@@ -41,7 +38,7 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
 }
 
 async function markReady($: EngineInterface) {
-  const ran = await $.process.run(['gh', 'pr', 'ready'], { timeoutMs: 30_000 });
+  const ran = await $.process.run(['gh', 'pr', 'ready']);
   if (ran.exitCode !== 0)
     $.ui.toast(`gh pr ready failed: ${ran.stderr.trim()}`);
   await refresh($);
@@ -55,14 +52,7 @@ async function land($: EngineInterface): Promise<string> {
   return 'Landing this branch’s pull request.';
 }
 
-let ticks = 0;
-
-/** Every minute while the branch has a PR; every fifth minute otherwise */
-async function poll($: EngineInterface) {
-  ticks += 1;
-  const snapshot = (await $.state.get(snapshotRef)).value;
-  if (snapshot?.kind === 'pr' || ticks % 5 === 0) await refresh($);
-}
+let afterPush: Timer | undefined;
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -83,7 +73,7 @@ export const register: Register = on => {
         isDeferred: false,
       }),
     ]);
-    $.clock.every(POLL_MS, () => void poll($));
+    $.clock.every(POLL_MS, () => void refresh($));
     void refresh($);
     return next(e);
   });
@@ -105,8 +95,11 @@ export const register: Register = on => {
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
-    if (BRANCH_CHANGES.test(e.command))
-      $.clock.after(AFTER_PUSH_MS, () => void refresh($));
+    const git = ran.isError ? undefined : ran.result?.gitOperation;
+    if (git?.push || git?.pr) {
+      afterPush?.cancel();
+      afterPush = $.clock.after(AFTER_PUSH_MS, () => void refresh($));
+    }
     return ran;
   }).catch(($, e, next) => next(e));
 

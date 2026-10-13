@@ -43,7 +43,6 @@ const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
               statusCheckRollup {
                 contexts(first: 100) {
                   nodes {
-                    __typename
                     ... on CheckRun { name status conclusion detailsUrl }
                     ... on StatusContext { context state targetUrl }
                   }
@@ -58,7 +57,6 @@ const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
 }`;
 
 type RollupItem = {
-  __typename?: string;
   name?: string;
   context?: string;
   status?: string;
@@ -182,7 +180,7 @@ async function readPr(run: Run, readText: ReadText): Promise<PrSnapshot> {
         preview.url.replace('{number}', String(raw.number))
       : undefined,
   };
-  return { kind: 'pr', pr, land: config.land ?? [] };
+  return { kind: 'pr', pr, land: config.land };
 }
 
 /** The repository's config; any part that is missing or malformed is left out */
@@ -194,9 +192,9 @@ async function readConfig(
   try {
     raw = JSON.parse(await readText(path));
   } catch {
-    return {};
+    return { land: [] };
   }
-  if (typeof raw !== 'object' || raw === null) return {};
+  if (typeof raw !== 'object' || raw === null) return { land: [] };
   const { preview, land } = raw as {
     preview?: { check?: unknown; url?: unknown };
     land?: unknown;
@@ -209,7 +207,7 @@ async function readConfig(
     land:
       Array.isArray(land) ?
         land.filter((step): step is string => typeof step === 'string')
-      : undefined,
+      : [],
   };
 }
 

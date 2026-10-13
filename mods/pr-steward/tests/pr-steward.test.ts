@@ -6,25 +6,21 @@ import { fetchSnapshot, parseChecks, summary } from '../hooks/pr';
 
 const ROLLUP = [
   {
-    __typename: 'StatusContext',
     context: 'ci/circleci: lint',
     state: 'FAILURE',
     targetUrl: 'https://circleci.com/lint',
   },
   {
-    __typename: 'CheckRun',
     name: 'Claude Approvals',
     status: 'IN_PROGRESS',
     detailsUrl: 'https://github.com/approvals',
   },
   {
-    __typename: 'CheckRun',
     name: 'docs deploy',
     status: 'COMPLETED',
     conclusion: 'SUCCESS',
   },
   {
-    __typename: 'CheckRun',
     name: 'benchmark',
     status: 'COMPLETED',
     conclusion: 'SKIPPED',
@@ -74,6 +70,21 @@ const PR = {
   },
 };
 
+/** PR with `oid` as its head; `contexts` null before GitHub reports any checks */
+const onCommit = (oid: string, contexts: unknown[] | null) => ({
+  ...PR,
+  commits: {
+    nodes: [
+      {
+        commit: {
+          oid,
+          statusCheckRollup: contexts && { contexts: { nodes: contexts } },
+        },
+      },
+    ],
+  },
+});
+
 const CONFIG = {
   preview: {
     check: 'docs deploy',
@@ -112,6 +123,16 @@ const readConfig = async (path: string) => {
 };
 
 /** Answers the plugin's process and file reads as ghRun and readConfig do */
+/** The prompts the mod submits, in order */
+function capturePrompts(on: On) {
+  const prompts: string[] = [];
+  on('prompt.submit', ($, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  return prompts;
+}
+
 function fakeHost(on: On, run: Run = ghRun()) {
   mock.clock(on);
   on('process.run', async ($, e) => ({
@@ -199,11 +220,7 @@ describe('pane', () => {
 
   test('Land asks the model to work every open item', async ($, on) => {
     fakeHost(on);
-    const prompts: string[] = [];
-    on('prompt.submit', ($, e) => {
-      prompts.push(e.text);
-      return { text: e.text };
-    });
+    const prompts = capturePrompts(on);
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' });
     await ui.press({ key: 'land' });
@@ -228,10 +245,7 @@ describe('failures', () => {
 
   test('a commit with no checks is not reported green', async () => {
     const snapshot = await fetchSnapshot(
-      ghRun({
-        ...PR,
-        commits: { nodes: [{ commit: { statusCheckRollup: null } }] },
-      }),
+      ghRun(onCommit('aaa', null)),
       readConfig,
     );
     expect(snapshot.kind === 'pr' && snapshot.pr.checks).toEqual([]);
@@ -281,11 +295,7 @@ describe('failures', () => {
 
 test('/land without a PR says so and submits nothing', async ($, on) => {
   fakeHost(on, ghRun(null));
-  const prompts: string[] = [];
-  on('prompt.submit', ($, e) => {
-    prompts.push(e.text);
-    return { text: e.text };
-  });
+  const prompts = capturePrompts(on);
   const ran = await $.command.run({
     command: 'land',
     args: '',
@@ -297,23 +307,11 @@ test('/land without a PR says so and submits nothing', async ($, on) => {
 });
 
 describe('toasts', () => {
-  const settled = (oid: string) => ({
-    ...PR,
-    commits: {
-      nodes: [
-        {
-          commit: {
-            oid,
-            statusCheckRollup: {
-              contexts: {
-                nodes: ROLLUP.filter(c => c.status !== 'IN_PROGRESS'),
-              },
-            },
-          },
-        },
-      ],
-    },
-  });
+  const settled = (oid: string) =>
+    onCommit(
+      oid,
+      ROLLUP.filter(c => c.status !== 'IN_PROGRESS'),
+    );
 
   /** Reads PR (checks running on aaa), then each of `reads`, collecting the toasts they raised */
   async function toastsAfter($: any, on: On, ...reads: unknown[]) {
@@ -338,17 +336,12 @@ describe('toasts', () => {
     ]);
   });
 
-  /** A read of `oid` before GitHub reports any checks */
-  const unreported = (oid: string) => ({
-    ...PR,
-    commits: { nodes: [{ commit: { oid, statusCheckRollup: null } }] },
-  });
-  const empty = unreported('aaa');
+  const unreported = (oid: string) => onCommit(oid, null);
 
   test('waits out a read with no checks', async ($, on) => {
-    expect(await toastsAfter($, on, empty, settled('aaa'))).toEqual([
-      'PR #4300: 1 failing (ci/circleci: lint)',
-    ]);
+    expect(await toastsAfter($, on, unreported('aaa'), settled('aaa'))).toEqual(
+      ['PR #4300: 1 failing (ci/circleci: lint)'],
+    );
   });
 
   test('says when checks go from none to settled', async ($, on) => {
@@ -387,7 +380,13 @@ describe('toasts', () => {
 
   test('says it once per commit', async ($, on) => {
     expect(
-      await toastsAfter($, on, settled('aaa'), empty, settled('aaa')),
+      await toastsAfter(
+        $,
+        on,
+        settled('aaa'),
+        unreported('aaa'),
+        settled('aaa'),
+      ),
     ).toEqual(['PR #4300: 1 failing (ci/circleci: lint)']);
   });
 

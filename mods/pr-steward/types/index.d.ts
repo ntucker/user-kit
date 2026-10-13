@@ -30,7 +30,7 @@ export type RepoConfig = {
   /** Link `url` ({number} is the PR's) once a check named `check` exists */
   preview?: { check: string; url: string };
   /** Steps /land adds after conflicts, CI and review threads */
-  land?: string[];
+  land: string[];
 };
 
 /** What the last refresh found: a PR, no PR for this branch, or why gh failed */
