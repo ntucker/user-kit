@@ -57,16 +57,16 @@ async function land($: EngineInterface): Promise<string> {
 let afterPush: Timer | undefined;
 let branch: string | undefined;
 
-let branchRead: Promise<void> | undefined;
+let branchQueue: Promise<void> | undefined;
 
 /**
  * Refreshes at once when Claude switched branches, so the pane never shows the
  * old branch's PR. Any command can switch (aliases, scripts), so this runs a
  * local git read after each one; reads run in order so a stale one can't win.
  */
-function checkBranch($: EngineInterface): Promise<void> {
-  const after = branchRead;
-  branchRead = (async () => {
+function checkBranch($: EngineInterface) {
+  const after = branchQueue;
+  branchQueue = (async () => {
     await after;
     const ran = await $.process.run([
       'git',
@@ -78,9 +78,8 @@ function checkBranch($: EngineInterface): Promise<void> {
     const now = ran.stdout.trim();
     const switched = branch !== undefined && now !== branch;
     branch = now;
-    if (switched) await refresh($);
+    if (switched) void refresh($);
   })().catch(() => undefined);
-  return branchRead;
 }
 
 export const register: Register = on => {

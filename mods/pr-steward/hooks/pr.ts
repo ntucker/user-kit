@@ -232,7 +232,7 @@ export const byState = (pr: Pr, state: CheckState) =>
 
 export const isConflicted = (pr: Pr) => pr.mergeState === 'DIRTY';
 
-/** Whether any check is still running, listed or past the listed ones */
+/** Whether GitHub still counts the run as going, or a listed check is pending */
 export const isRunning = (pr: Pr) =>
   pr.ci === 'pending' || byState(pr, 'pending').length > 0;
 
@@ -240,8 +240,8 @@ export const isRunning = (pr: Pr) =>
 export function ciText(pr: Pr): string {
   const failing = byState(pr, 'fail').length;
   const pending = byState(pr, 'pending').length;
-  if (failing || pr.ci === 'fail')
-    return failing ? `${failing} failing` : 'CI failing';
+  if (failing) return `${failing} failing`;
+  if (pr.ci === 'fail') return 'CI failing';
   if (isRunning(pr)) return pending ? `${pending} running` : 'CI running';
   return pr.ci === 'pass' ? 'CI green' : 'no checks yet';
 }

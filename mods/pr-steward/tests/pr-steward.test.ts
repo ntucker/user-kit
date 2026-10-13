@@ -313,7 +313,7 @@ describe('failures', () => {
     expect(snapshot.kind === 'pr' && snapshot.pr.number).toBe(4300);
   });
 
-  test("GitHub's overall state wins over the listed checks", async () => {
+  test("CI reads as the worse of GitHub's state and the listed checks", async () => {
     const passing = ROLLUP.filter(c => c.conclusion === 'SUCCESS');
     const read = (state: string) =>
       fetchSnapshot(ghRun(onCommit('aaa', passing, state)), readConfig);
@@ -323,6 +323,8 @@ describe('failures', () => {
     );
     const failed = await read('FAILURE');
     expect(failed.kind === 'pr' && headline(failed.pr)).toContain('CI failing');
+    const listed = await fetchSnapshot(ghRun(), readConfig);
+    expect(listed.kind === 'pr' && headline(listed.pr)).toContain('1 failing');
   });
 });
 
