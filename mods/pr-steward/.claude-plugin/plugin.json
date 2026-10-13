@@ -1,0 +1,12 @@
+{
+  "name": "pr-steward",
+  "version": "0.1.0",
+  "description": "Live pane, status line and toasts for the current branch's PR (CI, Claude Approvals, open review threads, conflicts, preview link), /land to drive it to mergeable, and a pr_status tool for the model",
+  "author": {
+    "name": "Nathaniel Tucker",
+    "email": "me@ntucker.me"
+  },
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "repository": "https://github.com/ntucker/user-kit"
+}
