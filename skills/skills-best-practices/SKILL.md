@@ -1,9 +1,9 @@
 ---
 name: skills-best-practices
-description: Write, audit, and improve Agent Skills (SKILL.md folders) for Cursor, including format, frontmatter, and where skills live. Use whenever the user wants to create a skill, edit or refactor one, review or audit skill quality, fix a skill that is not being picked up or triggers too often, improve a skill's description, run evals or benchmark a skill to test whether it actually helps, split or consolidate skills, convert a rule or command into a skill, turn a conversation or repeated workflow into one, or wants the agent to reliably follow some procedure, convention, or check across sessions without being reminded - even when they never say "skill", or only point at a .cursor/skills, .agents/skills, or ~/.cursor/skills path. Also use when explaining how skills work or should be written. Not for writing rules, hooks, or subagents, except to decide whether persistent behavior belongs in a skill or a rule.
+description: Write, audit, and improve Agent Skills (SKILL.md folders) for Cursor and Claude Code, including format, frontmatter, and where skills live. Use whenever the user wants to create a skill, edit or refactor one, review or audit skill quality, fix a skill that is not being picked up or triggers too often, improve a skill's description, run evals or benchmark a skill to test whether it actually helps, split or consolidate skills, convert a rule or command into a skill, turn a conversation or repeated workflow into one, or wants the agent to reliably follow some procedure, convention, or check across sessions without being reminded - even when they never say "skill", or only point at a .cursor/skills, .claude/skills, .agents/skills, or ~/.cursor/skills path. Also use when explaining how skills work or should be written. Not for writing rules, hooks, or subagents, except to decide whether persistent behavior belongs in a skill or a rule.
 license: Apache-2.0
 metadata:
-  sources: agentskills.io spec and guides; anthropics/skills skill-creator; cursor.com/docs/context/skills
+  sources: agentskills.io spec and guides; anthropics/skills skill-creator; cursor.com/docs/context/skills; code.claude.com/docs/en/skills
 ---
 
 # Skills best practices
@@ -38,17 +38,17 @@ Two instructions that conflict, or merely look like they conflict, make the agen
 
 ### Encode branching knowledge as decision trees
 
-When the right action depends on several factors, a table or tree of condition → action routes the agent in one read; the same information as prose forces it to hold every branch in mind and infer the routing. Make branches mutually exclusive, put the default first, and point each leaf at the reference or step that handles it. Cursor's triggering levers, for example:
+When the right action depends on several factors, a table or tree of condition → action routes the agent in one read; the same information as prose forces it to hold every branch in mind and infer the routing. Make branches mutually exclusive, put the default first, and point each leaf at the reference or step that handles it. The triggering levers, for example, which apply in both Cursor and Claude Code unless a row names one:
 
 | Relevance is determined by | Use |
 |---|---|
 | User intent | `description` alone; invest in its precision |
 | File type being edited | `paths` globs; description can be terse |
-| Location in a monorepo | Place the skill in that subdirectory's `.cursor/skills/` or `.agents/skills/` |
+| Location in a monorepo | Place the skill in that subdirectory's skills root: `.cursor/skills/` or `.agents/skills/` in Cursor, `.claude/skills/` in Claude Code |
 | Explicit user request only (slash-command workflows, costly or destructive procedures) | `disable-model-invocation: true`; trigger tuning is moot |
-| Whole-session behavior the user opts into (a working style, a playbook) | Design for Custom Mode: lean body, since it is present every turn |
+| Whole-session behavior the user opts into (a working style, a playbook) | Cursor: design for Custom Mode, with a lean body since it is present every turn. Claude Code has no Custom Mode; the user invokes `/name` |
 
-Cursor's default is auto-invocation; reserve explicit-only for procedures the user initiates. Current models also skip skills for tasks they can do trivially, so a matching description may not fire on one-step requests; that is expected.
+Both harnesses default to auto-invocation; reserve explicit-only for procedures the user initiates. Current models also skip skills for tasks they can do trivially, so a matching description may not fire on one-step requests; that is expected.
 
 ### Explain why; be rigid only where fragile
 
@@ -76,21 +76,21 @@ Write from real runs and artifacts: corrections you made, runbooks, schemas, rev
    | The guidance should apply… | Container |
    |---|---|
    | On demand, when a task matches | Skill (default) |
-   | Every turn of every session | Always-applied rule |
-   | Every turn, only when the user opts in | Skill used as a Custom Mode |
-   | With matching files, a few lines | Glob rule |
+   | Every turn of every session | Always-applied rule (Cursor) or `CLAUDE.md` (Claude Code) |
+   | Every turn, only when the user opts in | Skill used as a Custom Mode (Cursor only) |
+   | With matching files, a few lines | Glob rule (Cursor) or a `paths`-scoped rule in `.claude/rules/` (Claude Code) |
    | With matching files, more than a few lines or needing references or scripts | Skill with `paths` |
    | As a delegated role with its own context | Subagent |
    | As a deterministic action on an agent event | Hook |
 
-   Converting an existing rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill, slash command → explicit-only (skill "migrate-to-skills" automates these). A skill's contents must match what its description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
+   Converting an existing rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill, slash command (Cursor `.cursor/commands/`, Claude Code `.claude/commands/`) → explicit-only; in Cursor, skill "migrate-to-skills" automates these. A skill's contents must match what its description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
 3. Draft using [Skill format and locations](references/format.md) and [Body patterns](references/patterns.md), then read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
 4. Offer testing per Verify with execution and let the user decide: no eval artifacts until they opt in, and cases shown to them before any run. Explain jargon such as "eval" or "assertion" unless the user shows familiarity.
 
 ### Improving
 
 1. Classify the failure: mis-triggering → description or lever; wrong behavior → ambiguous, missing, or misleading instructions; slow or wasteful runs → bloat or instructions that do not apply; drift → stale conventions.
-2. Snapshot before editing so the old version is the baseline (location and layout in [Output-quality evals](references/evals.md)). Preserve `name` and folder. Managed skills (Cursor built-ins, plugin caches) are overwritten on update, so copy into your own skills directory and give the copy a distinct name and sharpened description—two discovered skills with one name and description compete, and precedence is undocumented.
+2. Snapshot before editing so the old version is the baseline (location and layout in [Output-quality evals](references/evals.md)). Preserve `name` and folder. Managed skills (Cursor built-ins, plugin caches, Claude Code plugin skills) are overwritten on update, so copy into your own skills directory and give the copy a distinct name and sharpened description—two discovered skills with one name and description compete, and precedence is undocumented.
 3. Apply the principles above: fix the class, remove before adding, resolve conflicts, re-layer. If the skill has evals or checkable outputs, re-run against the snapshot; otherwise cold-read as in Auditing and have the user retry the failing prompt.
 
 ### Auditing
@@ -110,7 +110,7 @@ Then offer one eval iteration under the same gate as Creating step 4: output eva
 - Read [Trigger accuracy](references/triggering.md) for any auto-invoked skill before shipping a description, or when it under- or over-triggers. Tune the description after the body is stable, since body changes move the boundary it must express.
 - Read [Scripts and commands](references/scripts.md) before writing or reviewing any bundled script or one-off command, or when transcripts show the agent rewriting the same helper.
 
-Eval-model rule: run skill-under-test runs on a cheap model of the current generation at medium effort or above, unless the user says otherwise; grade with a stronger one. A skill that only works when a frontier model fills in the gaps is under-specified, so a smaller current model exposes ambiguity, missing steps, and vague triggers, and passing there means the skill works across the models users actually run. Not a frontier model at low effort, and not an older generation (its failures reflect outdated training, and working around them bloats the skill). Use the user's own model only when they ask for fidelity to their setup. In Cursor, pick from the list the run mechanism offers: the Cursor-branded slug of the newest version at the lowest effort suffix that is still medium or above; if none is offered, Composer (which has no effort tiers).
+Eval-model rule: run skill-under-test runs on a cheap model of the current generation at medium effort or above, unless the user says otherwise; grade with a stronger one. A skill that only works when a frontier model fills in the gaps is under-specified, so a smaller current model exposes ambiguity, missing steps, and vague triggers, and passing there means the skill works across the models users actually run. Not a frontier model at low effort, and not an older generation (its failures reflect outdated training, and working around them bloats the skill). Use the user's own model only when they ask for fidelity to their setup. In Cursor, pick from the list the run mechanism offers: the Cursor-branded slug of the newest version at the lowest effort suffix that is still medium or above; if none is offered, Composer (which has no effort tiers). In Claude Code, use Haiku: `model: haiku` on each subagent run, `--model haiku --effort medium` on the CLI.
 
 Stop when feedback is empty, the user is satisfied, or gains stop justifying cost.
 
@@ -119,5 +119,5 @@ Stop when feedback is empty, the user is satisfied, or gains stop justifying cos
 - **"Write descriptions in third person" vs. "use imperative phrasing".** The first rejects sentences aimed at the user ("I can help you…", "You can use this to…"); the second wants an instruction aimed at the agent. Both are satisfied by a capability statement followed by "Use when…": "Extract tables from PDFs. Use when…".
 - **The docs' `SKILL.md` template shows a "When to Use" body section vs. "all trigger info goes in the description".** Omit the section from auto-invoked skills. Body conditionals route within the skill—including, for `/`-invoked or Custom Mode skills, which parts of a conversation the skill applies to.
 - **"Keep under 500 lines" vs. "go longer if needed".** The number is an attention heuristic, not a quota or a wall. Every line earns its place; when legitimately longer, split by when-needed.
-- **Skill "create-skill" says "Default `disable-model-invocation: true` … omit it only when the agent should auto-invoke from ambient context" vs. the platform's auto-invoke default.** The built-in states a blanket policy; this skill instead chooses the lever from the table above, because explicit-only forfeits the main value of a skill—help on tasks the user would not think to ask for—and is the right choice only when the user always initiates the procedure.
+- **Cursor's built-in skill "create-skill" says "Default `disable-model-invocation: true` … omit it only when the agent should auto-invoke from ambient context" vs. the platform's auto-invoke default.** The built-in states a blanket policy; this skill instead chooses the lever from the table above, because explicit-only forfeits the main value of a skill—help on tasks the user would not think to ask for—and is the right choice only when the user always initiates the procedure.
 - **The docs invoke scripts as `python scripts/<x>.py` vs. this skill's `python3 <skill-dir>/scripts/<x>.py`.** The docs' relative form assumes the running agent knows the skill folder; the placeholder makes that explicit for an agent whose shell runs from the workspace.

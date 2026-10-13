@@ -1,10 +1,10 @@
-# Output-quality evals in Cursor
+# Output-quality evals
 
-Answers "does this skill make outputs better, and at what cost?" by running the same prompts with and without the skill and grading with evidence. Use the available subagent tool with a fresh `generalPurpose` run for each case; some clients call it `Task`, others `Subagent`. Clean contexts make the comparison honest—you wrote the skill, so running it yourself proves little. Without subagents, use fresh chats or `agent -p`; running cases in the authoring session is only a sanity check and baselines mean nothing there.
+Answers "does this skill make outputs better, and at what cost?" by running the same prompts with and without the skill and grading with evidence. Use a fresh subagent run for each case: in Cursor, the subagent tool (`Task` or `Subagent`, depending on the client) with a `generalPurpose` run; in Claude Code, the Agent tool with `subagent_type: general-purpose`. Clean contexts make the comparison honest—you wrote the skill, so running it yourself proves little. Without subagents, use fresh chats or the headless CLI (`agent -p` in Cursor, `claude -p` in Claude Code); running cases in the authoring session is only a sanity check and baselines mean nothing there.
 
 ## Workspace
 
-Put the snapshot and run outputs in a directory outside every skills root—`/tmp/<skill>-workspace/` or a gitignored folder. Cursor discovers any `SKILL.md` under a skills root, so a snapshot placed there becomes a duplicate skill and contaminates the very runs meant to compare against it. (The case definitions themselves stay in the skill's `evals/`; they contain no `SKILL.md`.) Layout, created as you go:
+Put the snapshot and run outputs in a directory outside every skills root—`/tmp/<skill>-workspace/` or a gitignored folder. Both harnesses discover any `SKILL.md` under a skills root, so a snapshot placed there becomes a duplicate skill and contaminates the very runs meant to compare against it. (The case definitions themselves stay in the skill's `evals/`; they contain no `SKILL.md`.) Layout, created as you go:
 
 ```
 <workspace>/
@@ -38,7 +38,7 @@ Prompts read like real messages: file paths, column names, personal context, cas
 
 ## 2. Runs
 
-Spawn the with-skill and baseline subagents for every case in the same turn so they finish together. Set every runner's model per the eval-model rule, choosing from the session's available subagent models. Grade with a stronger model; the grader's judgment is not what is under test.
+Spawn the with-skill and baseline subagents for every case in the same turn so they finish together. Set every runner's model per the eval-model rule, choosing from the session's available subagent models (in Claude Code, pass `model: haiku` on each Agent call). Grade with a stronger model; the grader's judgment is not what is under test.
 
 With skill:
 
@@ -54,7 +54,14 @@ Execute this task.
 
 Baseline: identical prompt with the first bullet replaced by "Do not read any skill files" (saving to `without_skill/`) or by "Read only `<workspace>/skill-snapshot/SKILL.md`; do not read `<name>` from your skills list" (saving to `old_skill/`). The subagent can still see the live skill in its skills list; the instruction is the only barrier, so check its transcript for a read of the live path.
 
-A direct subagent result carries no token or duration fields; the run's own timestamps give duration. When token cost matters, run cases through the CLI instead—`agent -p --output-format json --trust -f --model <cheap model> --workspace <dir> "<prompt>"`—whose result event carries `duration_ms` and (undocumented but present) `usage` token counts. Without `-f`, unattended shell steps are denied and results are not comparable to subagent runs; with it, use the isolation above.
+Cost and duration depend on the harness:
+
+| Harness | Subagent result | CLI run with token counts |
+|---|---|---|
+| Cursor | No token or duration fields; the run's own timestamps give duration | `agent -p --output-format json --trust -f --model <cheap model> --workspace <dir> "<prompt>"`; the result event carries `duration_ms` and (undocumented but present) `usage`. Without `-f`, unattended shell steps are denied and results are not comparable to subagent runs |
+| Claude Code | The completion notification reports tokens and `duration_ms`; record them as each run finishes, because they appear nowhere else | From `<dir>`: `claude -p --output-format json --model haiku --effort medium --allowedTools "<tools the case needs>" "<prompt>"`; the result carries `duration_ms`, `usage`, and `total_cost_usd`. Tools left off `--allowedTools` are denied, so results are not comparable to subagent runs until the list covers what the case uses |
+
+Either way, pre-approving tools for unattended runs requires the isolation above.
 
 ## 3. Assertions
 

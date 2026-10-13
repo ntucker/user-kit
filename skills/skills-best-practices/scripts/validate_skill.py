@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a skill folder against the Agent Skills spec and Cursor conventions.
+"""Validate a skill folder against the Agent Skills spec and Cursor and Claude Code conventions.
 
 Checks core frontmatter fields, name/folder agreement, size budgets, referenced files,
 and authoring conventions (linked references, skill "name" form for other skills, no
@@ -20,6 +20,8 @@ COLORS = {"default", "green", "cyan", "blue", "purple", "magenta", "orange", "ye
 KNOWN_FIELDS = {
     "name", "description", "license", "compatibility", "metadata", "allowed-tools",  # open spec
     "paths", "globs", "disable-model-invocation", "icon", "color",  # Cursor
+    "when_to_use", "user-invocable", "argument-hint", "arguments", "disallowed-tools", "model", "effort",
+    "context", "agent", "background", "hooks", "shell",  # Claude Code
 }
 BUNDLE_DIRS = ("scripts/", "references/", "assets/")
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,}).*?^[ \t]*\1[ \t]*$", re.S | re.M)
