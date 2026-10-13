@@ -6,9 +6,9 @@ import {
   ciText,
   isRunning,
   fetchSnapshot,
-  headline,
   isConflicted,
   landPrompt,
+  statusText,
   summary,
 } from './pr';
 
@@ -35,14 +35,13 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
       path => $.fs.read(path),
     );
     await $.state.set(snapshotRef, next);
-    $.ui.status(next.kind === 'pr' ? headline(next.pr) : undefined);
+    $.ui.status(statusText(next));
     announce($, previous, next);
     return next;
-  })().catch((error): PrSnapshot => {
-    // a host call failed after the read; say so where the user looks
-    $.ui.status(`PR read failed: ${String(error)}`);
-    return { kind: 'error', message: String(error) };
-  });
+  })().catch((error): PrSnapshot => ({
+    kind: 'error',
+    message: String(error),
+  }));
   return latest;
 }
 

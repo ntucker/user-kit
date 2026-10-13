@@ -328,6 +328,17 @@ describe('failures', () => {
   });
 });
 
+test('the status line shows a failed read', async ($, on) => {
+  fakeHost(on, ghRun(PR, exited(1, '', 'rate limited')));
+  const lines: (string | undefined)[] = [];
+  on('ui.status', ($, e) => {
+    lines.push(e.text);
+    return { value: undefined };
+  });
+  await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+  expect(lines.at(-1)).toBe('PR read failed: rate limited');
+});
+
 test('/land without a PR says so and submits nothing', async ($, on) => {
   fakeHost(on, ghRun(null));
   const prompts = capturePrompts(on);

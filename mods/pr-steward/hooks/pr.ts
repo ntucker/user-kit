@@ -259,6 +259,13 @@ export function headline(pr: Pr): string {
   return parts.join(' · ');
 }
 
+/** The status line for a snapshot; nothing when the branch has no PR */
+export function statusText(snapshot: PrSnapshot): string | undefined {
+  if (snapshot.kind === 'pr') return headline(snapshot.pr);
+  if (snapshot.kind === 'error') return `PR read failed: ${snapshot.message}`;
+  return undefined;
+}
+
 /** What the model reads from pr_status and /land */
 export function summary(snapshot: PrSnapshot): string {
   if (snapshot.kind === 'error')
