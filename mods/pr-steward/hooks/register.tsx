@@ -20,8 +20,8 @@ const POLL_MS = 60_000;
 const AFTER_PUSH_MS = 15_000;
 
 let latest: Promise<PrSnapshot> | undefined;
-/** Whether the branch last had a PR; a failed read only shows while tracking one, not in repos gh can't read at all */
-let tracking = false;
+/** Whether the branch last had a PR; a failed read only shows then, not in repos gh can't read at all */
+let hadPr = false;
 
 /**
  * Reads the PR through gh; reads run one after another, so each caller sees
@@ -37,8 +37,10 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
       path => $.fs.read(path),
     );
     await $.state.set(snapshotRef, next);
-    if (next.kind !== 'error') tracking = next.kind === 'pr';
-    $.ui.status(tracking ? statusText(next) : undefined);
+    // a failed read says nothing about the PR, so it keeps the last answer
+    if (next.kind === 'pr') hadPr = true;
+    else if (next.kind === 'none') hadPr = false;
+    $.ui.status(hadPr ? statusText(next) : undefined);
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({
@@ -87,6 +89,7 @@ function checkBranch($: EngineInterface) {
     const now = ran.stdout.trim();
     const switched = branch !== undefined && now !== branch;
     branch = now;
+    if (switched) hadPr = false;
     // not awaited: the next branch read shouldn't wait on GitHub
     if (switched) void refresh($);
   })().catch(() => undefined);

@@ -342,7 +342,7 @@ test('the status line shows a failed read only while tracking a PR', async ($, o
   });
   const read = () => $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
   await read();
-  expect(lines.at(-1)).toBeUndefined();
+  expect(lines).toEqual([undefined]);
   failure = undefined;
   await read();
   failure = exited(1, '', 'rate limited\ntry later');
