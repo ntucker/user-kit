@@ -21,9 +21,12 @@ const AFTER_PUSH_MS = 15_000;
 
 let latest: Promise<PrSnapshot> | undefined;
 
-/** Reads the PR through gh; reads run one after another, so each caller sees GitHub as of its call */
+/**
+ * Reads the PR through gh; reads run one after another, so each caller sees
+ * GitHub as of its call. Never rejects, so callers can fire and forget.
+ */
 function refresh($: EngineInterface): Promise<PrSnapshot> {
-  const after = latest?.catch(() => undefined);
+  const after = latest;
   latest = (async () => {
     await after;
     const previous = (await $.state.get(snapshotRef)).value ?? null;
@@ -35,7 +38,10 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     $.ui.status(next.kind === 'pr' ? headline(next.pr) : undefined);
     announce($, previous, next);
     return next;
-  })();
+  })().catch((error): PrSnapshot => ({
+    kind: 'error',
+    message: String(error),
+  }));
   return latest;
 }
 
@@ -78,6 +84,7 @@ function checkBranch($: EngineInterface) {
     const now = ran.stdout.trim();
     const switched = branch !== undefined && now !== branch;
     branch = now;
+    // not awaited: the next branch read shouldn't wait on GitHub
     if (switched) void refresh($);
   })().catch(() => undefined);
 }
