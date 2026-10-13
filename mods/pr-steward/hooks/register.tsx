@@ -4,6 +4,7 @@ import type { PrSnapshot } from '../types';
 import {
   byState,
   ciText,
+  isRunning,
   fetchSnapshot,
   headline,
   isConflicted,
@@ -56,13 +57,30 @@ async function land($: EngineInterface): Promise<string> {
 let afterPush: Timer | undefined;
 let branch: string | undefined;
 
-/** Refreshes at once when Claude switched branches, so the pane never shows the old branch's PR */
-async function checkBranch($: EngineInterface) {
-  const ran = await $.process.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
-  const now = ran.stdout.trim();
-  const switched = branch !== undefined && now !== branch;
-  branch = now;
-  if (switched) await refresh($);
+let branchRead: Promise<void> | undefined;
+
+/**
+ * Refreshes at once when Claude switched branches, so the pane never shows the
+ * old branch's PR. Any command can switch (aliases, scripts), so this runs a
+ * local git read after each one; reads run in order so a stale one can't win.
+ */
+function checkBranch($: EngineInterface): Promise<void> {
+  const after = branchRead;
+  branchRead = (async () => {
+    await after;
+    const ran = await $.process.run([
+      'git',
+      'rev-parse',
+      '--abbrev-ref',
+      'HEAD',
+    ]);
+    if (ran.exitCode !== 0) return;
+    const now = ran.stdout.trim();
+    const switched = branch !== undefined && now !== branch;
+    branch = now;
+    if (switched) await refresh($);
+  })().catch(() => undefined);
+  return branchRead;
 }
 
 export const register: Register = on => {
@@ -86,7 +104,7 @@ export const register: Register = on => {
     ]);
     $.clock.every(POLL_MS, () => void refresh($));
     void refresh($);
-    void checkBranch($).catch(() => undefined);
+    void checkBranch($);
     return next(e);
   });
 
@@ -107,7 +125,7 @@ export const register: Register = on => {
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
-    void checkBranch($).catch(() => undefined);
+    void checkBranch($);
     const git = ran.isError ? undefined : ran.result?.gitOperation;
     if (git?.push || git?.pr) {
       afterPush?.cancel();
@@ -236,7 +254,7 @@ function announce(
   // a commit first seen settled stays quiet; a re-run is announced again, but
   // an empty read of a commit already seen is only GitHub catching up
   const seen = runs.get(pr.head);
-  if (pr.ci === 'pending' || (pr.ci === 'none' && !seen))
+  if (isRunning(pr) || (pr.ci === 'none' && !seen))
     runs.set(pr.head, 'running');
   else if (pr.ci !== 'none') {
     runs.set(pr.head, 'settled');

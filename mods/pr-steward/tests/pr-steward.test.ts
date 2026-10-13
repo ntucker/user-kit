@@ -265,7 +265,7 @@ describe('failures', () => {
     );
     expect(snapshot.kind === 'pr' && snapshot.pr.checks).toEqual([]);
     expect(summary(snapshot)).toContain(
-      'Checks (no checks yet): 0 failing, 0 running, 0 passing',
+      'CI: no checks yet\nChecks: 0 failing, 0 running, 0 passing',
     );
   });
 
@@ -412,6 +412,24 @@ describe('toasts', () => {
     ).toEqual([]);
   });
 
+  test('waits for every check, not just the first failure', async ($, on) => {
+    expect(
+      await toastsAfter($, on, onCommit('aaa', ROLLUP, 'FAILURE')),
+    ).toEqual([]);
+  });
+
+  test('says when CI goes green', async ($, on) => {
+    const passing = ROLLUP.filter(c => c.conclusion === 'SUCCESS');
+    expect(
+      await toastsAfter(
+        $,
+        on,
+        onCommit('ddd', null),
+        onCommit('ddd', passing, 'SUCCESS'),
+      ),
+    ).toEqual(['PR #4300: CI green']);
+  });
+
   test('says it once per commit', async ($, on) => {
     expect(
       await toastsAfter(
@@ -455,22 +473,27 @@ describe('refreshes', () => {
     if (branch) current = branch;
     await $.tool.call({ tool: 'Bash', command: 'x' });
     await clock.advance(1);
-    const now = reads.length;
+    const atOnce = reads.length;
+    // CI needs a moment to register a push's checks
     await clock.advance(15_000);
-    return [now, reads.length - now];
+    return { atOnce, after15s: reads.length - atOnce };
   }
 
   test('15s after a push', async ($, on) => {
-    expect(await bash($, on, { push: { branch: 'faster-search' } })).toEqual([
-      0, 1,
-    ]);
+    expect(await bash($, on, { push: { branch: 'faster-search' } })).toEqual({
+      atOnce: 0,
+      after15s: 1,
+    });
   });
 
   test('at once after a branch switch', async ($, on) => {
-    expect(await bash($, on, undefined, 'other')).toEqual([1, 0]);
+    expect(await bash($, on, undefined, 'other')).toEqual({
+      atOnce: 1,
+      after15s: 0,
+    });
   });
 
   test('not after other commands', async ($, on) => {
-    expect(await bash($, on)).toEqual([0, 0]);
+    expect(await bash($, on)).toEqual({ atOnce: 0, after15s: 0 });
   });
 });

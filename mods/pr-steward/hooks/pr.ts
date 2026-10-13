@@ -17,11 +17,15 @@ export type ReadText = (path: string) => Promise<string>;
 /** Where a repository puts its preview link and extra /land steps */
 const CONFIG_PATH = '.claude/pr-steward.json';
 
-/** One read of everything the mod shows, so a snapshot is all or nothing */
+/**
+ * One read of everything the mod shows, so a snapshot is all or nothing.
+ * Several PRs, because forks' PRs can share the branch's name; the last
+ * threads, because GitHub lists them oldest first and old ones are resolved.
+ */
 const QUERY = `query($owner: String!, $name: String!, $branch: String!) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef { name }
-    pullRequests(headRefName: $branch, states: OPEN, first: 5) {
+    pullRequests(headRefName: $branch, states: OPEN, first: 10) {
       nodes {
         number
         title
@@ -228,12 +232,17 @@ export const byState = (pr: Pr, state: CheckState) =>
 
 export const isConflicted = (pr: Pr) => pr.mergeState === 'DIRTY';
 
-/** CI in a few words; GitHub's overall state decides, the listed checks give the count */
+/** Whether any check is still running, listed or past the listed ones */
+export const isRunning = (pr: Pr) =>
+  pr.ci === 'pending' || byState(pr, 'pending').length > 0;
+
+/** CI in a few words: GitHub's overall state, or the listed checks, whichever is worse */
 export function ciText(pr: Pr): string {
   const failing = byState(pr, 'fail').length;
   const pending = byState(pr, 'pending').length;
-  if (pr.ci === 'fail') return failing ? `${failing} failing` : 'CI failing';
-  if (pr.ci === 'pending') return pending ? `${pending} running` : 'CI running';
+  if (failing || pr.ci === 'fail')
+    return failing ? `${failing} failing` : 'CI failing';
+  if (isRunning(pr)) return pending ? `${pending} running` : 'CI running';
   return pr.ci === 'pass' ? 'CI green' : 'no checks yet';
 }
 
@@ -267,7 +276,8 @@ export function summary(snapshot: PrSnapshot): string {
   const failing = byState(pr, 'fail');
   const pending = byState(pr, 'pending');
   lines.push(
-    `Checks (${ciText(pr)}): ${failing.length} failing, ${pending.length} running, ${byState(pr, 'pass').length} passing`,
+    `CI: ${ciText(pr)}`,
+    `Checks: ${failing.length} failing, ${pending.length} running, ${byState(pr, 'pass').length} passing`,
   );
   for (const check of failing)
     lines.push(`- FAILING ${check.name}${check.url ? ` ${check.url}` : ''}`);
