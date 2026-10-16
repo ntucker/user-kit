@@ -3,7 +3,8 @@
 
 `agents/*.md` keeps Cursor frontmatter (`model: claude-opus-5-5[effort=high]`),
 which Claude Code sends to the API verbatim and gets a 404. This writes
-`claude/agents/<name>.md` with `model` and `effort` split and Cursor's
+`claude/agents/<name>.md` with `model` and `effort` split (a non-Claude model
+becomes `inherit`) and Cursor's
 `readonly: true` expressed as `disallowedTools`, and points
 `.claude-plugin/plugin.json` at those files so Claude Code skips `agents/`.
 
@@ -36,7 +37,8 @@ def to_claude(name: str, frontmatter: str) -> str:
     def replace(match: re.Match) -> str:
         model, effort = match.group(1), match.group(2)
         if not CLAUDE_MODEL.fullmatch(model):
-            sys.exit(f"agents/{name}: model {model!r} is not a Claude Code model")
+            # Another provider's model (Gemini, GPT): Claude Code runs the agent on the session model.
+            return "model: inherit"
         if effort and effort not in EFFORTS:
             sys.exit(f"agents/{name}: effort {effort!r} is not one of {sorted(EFFORTS)}")
         return f"model: {model}" + (f"\neffort: {effort}" if effort else "")
