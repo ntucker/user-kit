@@ -1,6 +1,6 @@
 {
   "name": "user-kit",
-  "description": "Personal skills and subagents (advisor workflow, human-first planning, clean code, writing, React, REST API design, skill authoring).",
+  "description": "Personal skills and subagents (advisor workflow, human-first planning, clean code, React, REST API design, skill authoring).",
   "author": {
     "name": "Nathaniel Tucker",
     "email": "me@ntucker.me"
