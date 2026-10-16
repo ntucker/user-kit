@@ -28,6 +28,7 @@ HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_agents.py. D
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
+OTHER_PROVIDER_MODEL = re.compile(r"(gemini|gpt|grok|composer)(-[\w.-]+)?")
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
 
@@ -36,6 +37,8 @@ def to_claude(name: str, frontmatter: str) -> str:
 
     def replace(match: re.Match) -> str:
         model, effort = match.group(1), match.group(2)
+        if not CLAUDE_MODEL.fullmatch(model):
+            sys.exit(f"agents/{name}: model {model!r} is not a Claude Code model")
         if effort and effort not in EFFORTS:
             sys.exit(f"agents/{name}: effort {effort!r} is not one of {sorted(EFFORTS)}")
         return f"model: {model}" + (f"\neffort: {effort}" if effort else "")
@@ -50,7 +53,7 @@ def expected() -> dict[Path, str]:
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         model = MODEL_LINE.search(text[:frontmatter_end])
-        if model and not CLAUDE_MODEL.fullmatch(model.group(1)):
+        if model and OTHER_PROVIDER_MODEL.fullmatch(model.group(1)):
             continue
         files[TARGET / source.name] = (
             to_claude(source.name, text[:frontmatter_end])
