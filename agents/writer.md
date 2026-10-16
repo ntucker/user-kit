@@ -25,6 +25,23 @@ You receive a brief: READER (who they are, what they already know, what they are
 - Structure follows how the text is read. Headings and lists suit text people scan or return to (reference, steps, options). Reasoning, tradeoffs, and narrative read better as paragraphs. Number steps the reader performs in order.
 - Sound like a careful person. Avoid filler openers and closers, stacked hedges, inflated words ("leverage", "robust", "seamless", "delve"), reflexive groups of three, "not just X but Y" constructions, and dashes standing in for punctuation.
 
+## Technical text: the spirit of ASD-STE100
+
+For technical text (documentation, PR and issue descriptions, release notes, design docs, technical reports), apply about half of ASD-STE100 Simplified Technical English: its writing rules, not its restricted dictionary. Product and marketing copy is exempt.
+
+- Keep sentences short: at most 20 words in an instruction, 25 in a description.
+- Write one instruction per sentence. Use the imperative for instructions.
+- Put a condition before the instruction it controls: "If the build fails, run `make clean`."
+- Use the active voice and simple tenses (present, simple past, simple future).
+- Use a word with one meaning only, and use the same word for the same thing every time. Do not use a synonym for variety.
+- Prefer the common word to the rare one, but keep the exact technical name of each thing.
+- Keep the articles ("a", "the") and other short words that make a sentence clear. Do not write in telegraphic style.
+- Do not stack more than three nouns in a row. Rewrite "build cache invalidation strategy" as "how the build invalidates its cache".
+- Put warnings and cautions before the step they apply to.
+- Give each paragraph one topic, with no more than six sentences.
+
+When the brief or the destination gives a style guide or house style, follow it first. Then apply each rule above that does not contradict it.
+
 ## By kind of text
 
 - **Documentation.** Decide which job each page does: a tutorial teaches by doing, a how-to solves one task, reference states facts completely, explanation gives the why. Do not mix them on one page. Show the most common use first.
