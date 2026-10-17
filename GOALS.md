@@ -24,6 +24,6 @@ These constraints are the contract for anyone editing this tree. A change that v
 ## Claude Code
 
 9. **The same tree is a Claude Code plugin.** It loads `skills/` directly, so skills are shared as-is. It also loads `workflows/*.js` as `user-kit:<name>` workflows, which are Claude-only.
-10. **`claude/agents/` is generated.** Edit `agents/`, then run `python3 scripts/build_claude_agents.py`. It also rewrites the `agents` list in `.claude-plugin/plugin.json`. Never hand-edit either. CI regenerates them on `main` when a sync pushes `agents/` changes without them.
+10. **`claude/agents/` and `claude/skills/` are generated.** Edit `agents/`, then run `python3 scripts/build_claude_agents.py`. It also rewrites the `agents` and `skills` lists in `.claude-plugin/plugin.json`. Never hand-edit either. CI regenerates them on `main` when a sync pushes `agents/` changes without them.
 
 Adding files for another tool is fine when it does not rename, move, or replace the Cursor manifest, `skills/`, or `agents/`.
