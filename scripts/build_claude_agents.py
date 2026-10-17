@@ -43,6 +43,7 @@ HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_agents.py. D
 SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", re.M)
 SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
 SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
+ANY_MARKER = re.compile(r"<!-- /?(subagent-only|claude-skill)")
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
@@ -87,12 +88,16 @@ def expected() -> dict[Path, str]:
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
         if description := SKILL_DESCRIPTION.search(body):
             skills[SKILLS / source.stem / "SKILL.md"] = skill(source.stem, description.group(1), body)
+            if ANY_MARKER.search(skills[SKILLS / source.stem / "SKILL.md"]):
+                sys.exit(f"agents/{source.name}: unmatched marker left in the generated skill")
+        elif ANY_MARKER.search(body):
+            sys.exit(f"agents/{source.name}: has skill markers but no claude-skill-description line")
         model = MODEL_LINE.search(frontmatter)
         if model and OTHER_PROVIDER_MODEL.fullmatch(model.group(1)):
             continue
-        agents[TARGET / source.name] = (
-            to_claude(source.name, frontmatter) + HEADER.format(name=source.name) + subagent_body(body)
-        )
+        if ANY_MARKER.search(subagent := subagent_body(body)):
+            sys.exit(f"agents/{source.name}: unmatched marker left in the generated agent")
+        agents[TARGET / source.name] = to_claude(source.name, frontmatter) + HEADER.format(name=source.name) + subagent
     manifest = json.loads(MANIFEST.read_text())
     manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in agents]
     manifest.pop("skills", None)
