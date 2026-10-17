@@ -6,11 +6,11 @@ description: "Rules for writing and editing prose whose primary reader is a huma
 
 Follow these rules for prose a person will read. The goal is text that reader understands on the first pass and can act on. Before writing, settle who the reader is and what they already know, what they should know or do afterward, and where the text goes. Read the code the text describes when accuracy depends on it.
 
-The house style and the destination's own template or style guide (a PR template, a docs structure, a voice guide) override every rule below. Where they are silent, the rules below apply.
+The project's house style and the destination's own template or style guide (a PR template, a docs structure, a voice guide) override every rule below. Where they are silent, the rules below apply.
 
 ## Accuracy
 
-- Every claim traces to your source material or to something you read. Never invent behavior, numbers, quotes, links, or outcomes. If a fact you need is missing, write around it and flag it, or leave a visible `TODO:` placeholder when the text cannot stand without it.
+- Every claim traces to your source material or to something you read. Never invent behavior, numbers, quotes, links, or outcomes. If a fact you need is missing, write around it and report it as a gap, or leave a visible `TODO:` placeholder when the text cannot stand without it.
 - Check what the text says against the code it documents: names, signatures, defaults, commands, and examples. A code example must run as written, with its imports.
 
 ## How to write
