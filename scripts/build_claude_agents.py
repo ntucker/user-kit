@@ -51,8 +51,13 @@ OTHER_PROVIDER_MODEL = re.compile(r"(gemini|gpt|grok|composer)(-[\w.-]+)?")
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
 
-def to_claude(name: str, frontmatter: str) -> str:
-    """Rewrite Cursor frontmatter for Claude Code, failing on values Claude Code would reject."""
+def to_claude(name: str, frontmatter: str) -> str | None:
+    """Rewrite Cursor frontmatter for Claude Code, failing on values Claude Code would reject.
+
+    Returns None for another provider's model: that agent is Cursor-only."""
+    model = MODEL_LINE.search(frontmatter)
+    if model and OTHER_PROVIDER_MODEL.fullmatch(model.group(1)):
+        return None
 
     def replace(match: re.Match) -> str:
         model, effort = match.group(1), match.group(2)
@@ -66,18 +71,13 @@ def to_claude(name: str, frontmatter: str) -> str:
     return READONLY_LINE.sub("disallowedTools: Write, Edit, NotebookEdit", frontmatter, count=1)
 
 
-def subagent_body(body: str) -> str:
-    body = SKILL_ONLY.sub("", SKILL_DESCRIPTION.sub("", body))
-    return SUBAGENT_ONLY.sub(r"\1", body)
-
-
-def skill(name: str, description: str, body: str) -> str:
-    body = SUBAGENT_ONLY.sub("", SKILL_DESCRIPTION.sub("", body))
-    return (
-        f"---\nname: {name}\ndescription: {json.dumps(description)}\n---\n"
-        + HEADER.format(name=f"{name}.md")
-        + SKILL_ONLY.sub(r"\1", body)
-    )
+def render(name: str, body: str, target: str) -> str:
+    """Keep the marked blocks for `target` ("skill" or "agent") and drop the other's."""
+    keep, drop = (SKILL_ONLY, SUBAGENT_ONLY) if target == "skill" else (SUBAGENT_ONLY, SKILL_ONLY)
+    out = keep.sub(r"\1", drop.sub("", SKILL_DESCRIPTION.sub("", body)))
+    if ANY_MARKER.search(out):
+        sys.exit(f"agents/{name}: unmatched marker left in the generated {target}")
+    return out
 
 
 def expected() -> dict[Path, str]:
@@ -86,22 +86,20 @@ def expected() -> dict[Path, str]:
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
-        if not body.count("<!-- subagent-only -->") == body.count("<!-- /subagent-only -->") == len(
-            SUBAGENT_ONLY.findall(body)
-        ):
+        header = HEADER.format(name=source.name)
+        opened, closed = body.count("<!-- subagent-only -->"), body.count("<!-- /subagent-only -->")
+        if opened != closed or opened != len(SUBAGENT_ONLY.findall(body)):
             sys.exit(f"agents/{source.name}: subagent-only markers do not pair up")
         if description := SKILL_DESCRIPTION.search(body):
-            skills[SKILLS / source.stem / "SKILL.md"] = skill(source.stem, description.group(1), body)
-            if ANY_MARKER.search(skills[SKILLS / source.stem / "SKILL.md"]):
-                sys.exit(f"agents/{source.name}: unmatched marker left in the generated skill")
+            skills[SKILLS / source.stem / "SKILL.md"] = (
+                f"---\nname: {source.stem}\ndescription: {json.dumps(description.group(1))}\n---\n"
+                + header
+                + render(source.name, body, "skill")
+            )
         elif ANY_MARKER.search(body):
             sys.exit(f"agents/{source.name}: has skill markers but no claude-skill-description line")
-        model = MODEL_LINE.search(frontmatter)
-        if model and OTHER_PROVIDER_MODEL.fullmatch(model.group(1)):
-            continue
-        if ANY_MARKER.search(subagent := subagent_body(body)):
-            sys.exit(f"agents/{source.name}: unmatched marker left in the generated agent")
-        agents[TARGET / source.name] = to_claude(source.name, frontmatter) + HEADER.format(name=source.name) + subagent
+        if (claude_frontmatter := to_claude(source.name, frontmatter)) is not None:
+            agents[TARGET / source.name] = claude_frontmatter + header + render(source.name, body, "agent")
     manifest = json.loads(MANIFEST.read_text())
     manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in agents]
     manifest.pop("skills", None)
