@@ -65,6 +65,7 @@ Use this instead of the GitHub marketplace on the authoring machine, not alongsi
 - `skills/<name>/SKILL.md` — personal skills, shared by Cursor and Claude Code
 - `agents/<name>.md` — subagents, in Cursor frontmatter
 - `claude/agents/<name>.md` — generated Claude Code copies of `agents/` (minus Cursor-only agents on non-Claude models)
+- `claude/skills/<name>/SKILL.md` — generated Claude Code skills from agents that opt in, for instructions Claude should follow in its own context (Cursor ignores them)
 - `workflows/<name>.js` — Claude Code Workflow scripts, run as `user-kit:<name>` (Cursor ignores them)
 - `mods/<name>/` — Claude Code mods, each its own plugin in the Claude marketplace (install `<name>@user-kit`; Cursor ignores them)
 - `.cursor-plugin/` — Cursor manifest and marketplace

@@ -8,6 +8,20 @@ which Claude Code sends to the API verbatim and gets a 404. This writes
 `.claude-plugin/plugin.json` at those files so Claude Code skips `agents/`.
 An agent on another provider's model (Gemini, GPT) is Cursor-only and gets no copy.
 
+An agent can also ship its instructions to Claude Code as a skill, for when a
+subagent on the session's own model would only lose the conversation's context.
+Its body then carries markers, which Cursor reads as HTML comments:
+
+    <!-- claude-skill-description: ... -->   opts in; the skill's description
+    <!-- claude-skill                        text only the skill gets
+    ...
+    -->
+    <!-- subagent-only -->                   text only the subagent gets
+    ...
+    <!-- /subagent-only -->
+
+The skill is written to `claude/skills/<name>/SKILL.md`, which Cursor does not load.
+
     python3 scripts/build_claude_agents.py          # regenerate
     python3 scripts/build_claude_agents.py --check  # exit 1 if out of date
 """
@@ -20,11 +34,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "agents"
 TARGET = ROOT / "claude" / "agents"
+SKILLS = ROOT / "claude" / "skills"
 MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
 
 MODEL_LINE = re.compile(r"^model:\s*(\S+?)(?:\[effort=([\w-]+)\])?\s*$", re.M)
 READONLY_LINE = re.compile(r"^readonly:\s*true\s*$", re.M)
 HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_agents.py. Do not edit. -->\n"
+SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", re.M)
+SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
+SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
@@ -47,21 +65,40 @@ def to_claude(name: str, frontmatter: str) -> str:
     return READONLY_LINE.sub("disallowedTools: Write, Edit, NotebookEdit", frontmatter, count=1)
 
 
+def subagent_body(body: str) -> str:
+    body = SKILL_ONLY.sub("", SKILL_DESCRIPTION.sub("", body))
+    return SUBAGENT_ONLY.sub(r"\1", body)
+
+
+def skill(name: str, description: str, body: str) -> str:
+    body = SUBAGENT_ONLY.sub("", SKILL_DESCRIPTION.sub("", body))
+    return (
+        f"---\nname: {name}\ndescription: {json.dumps(description)}\n---\n"
+        + HEADER.format(name=f"{name}.md")
+        + SKILL_ONLY.sub(r"\1", body)
+    )
+
+
 def expected() -> dict[Path, str]:
-    files = {}
+    agents, skills = {}, {}
     for source in sorted(SOURCE.glob("*.md")):
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
-        model = MODEL_LINE.search(text[:frontmatter_end])
+        frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
+        if description := SKILL_DESCRIPTION.search(body):
+            skills[SKILLS / source.stem / "SKILL.md"] = skill(source.stem, description.group(1), body)
+        model = MODEL_LINE.search(frontmatter)
         if model and OTHER_PROVIDER_MODEL.fullmatch(model.group(1)):
             continue
-        files[TARGET / source.name] = (
-            to_claude(source.name, text[:frontmatter_end])
-            + HEADER.format(name=source.name)
-            + text[frontmatter_end:]
+        agents[TARGET / source.name] = (
+            to_claude(source.name, frontmatter) + HEADER.format(name=source.name) + subagent_body(body)
         )
     manifest = json.loads(MANIFEST.read_text())
-    manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in files]
+    manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in agents]
+    manifest.pop("skills", None)
+    if skills:
+        manifest["skills"] = [f"./{SKILLS.relative_to(ROOT)}/"]
+    files = agents | skills
     files[MANIFEST] = json.dumps(manifest, indent=2) + "\n"
     return files
 
@@ -71,6 +108,7 @@ def main() -> int:
     stale = sorted(
         {path for path, text in files.items() if not path.exists() or path.read_text() != text}
         | {path for path in TARGET.glob("*.md") if path not in files}
+        | {path for path in SKILLS.glob("*/SKILL.md") if path not in files}
     )
     if "--check" in sys.argv:
         for path in stale:
@@ -78,12 +116,14 @@ def main() -> int:
         if stale:
             print("run: python3 scripts/build_claude_agents.py")
         return 1 if stale else 0
-    TARGET.mkdir(parents=True, exist_ok=True)
     for path in stale:
         if path in files:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(files[path])
         else:
             path.unlink()
+            if not any(path.parent.iterdir()):
+                path.parent.rmdir()
     return 0
 
 
