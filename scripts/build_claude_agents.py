@@ -86,6 +86,10 @@ def expected() -> dict[Path, str]:
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
+        if not body.count("<!-- subagent-only -->") == body.count("<!-- /subagent-only -->") == len(
+            SUBAGENT_ONLY.findall(body)
+        ):
+            sys.exit(f"agents/{source.name}: subagent-only markers do not pair up")
         if description := SKILL_DESCRIPTION.search(body):
             skills[SKILLS / source.stem / "SKILL.md"] = skill(source.stem, description.group(1), body)
             if ANY_MARKER.search(skills[SKILLS / source.stem / "SKILL.md"]):
