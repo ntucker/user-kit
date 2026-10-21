@@ -5,12 +5,16 @@
     "email": "me@ntucker.me"
   },
   "metadata": {
-    "description": "Single-plugin marketplace for personal Claude Code skills and subagents."
+    "description": "Personal Claude Code skills and subagents (user-kit), plus Claude Code mods."
   },
   "plugins": [
     {
       "name": "user-kit",
       "source": "./"
+    },
+    {
+      "name": "pr-steward",
+      "source": "./mods/pr-steward"
     }
   ]
 }
