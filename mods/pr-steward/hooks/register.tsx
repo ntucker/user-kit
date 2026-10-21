@@ -33,7 +33,10 @@ let afterPush: Timer | undefined;
 let branch: string | undefined;
 
 function track($: EngineInterface) {
-  poll ??= $.clock.every(POLL_MS, () => void refresh($));
+  if (poll) return;
+  poll = $.clock.every(POLL_MS, () => void refresh($));
+  // learn the branch now, so the next command's checkout counts as a switch
+  void checkBranch($);
 }
 
 function untrack() {

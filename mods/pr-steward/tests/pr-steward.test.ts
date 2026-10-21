@@ -489,9 +489,8 @@ describe('refreshes', () => {
         gitOperation: operation,
       },
     }));
-    // asking about the PR starts tracking it; the first command learns the branch
+    // asking about the PR starts tracking it, which learns the branch
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
-    await $.tool.call({ tool: 'Bash', command: 'true' });
     await clock.advance(1);
     reads.length = 0;
     operation = gitOperation;
