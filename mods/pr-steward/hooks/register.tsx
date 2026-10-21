@@ -72,7 +72,8 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     if (next.kind === 'pr') hadPr = true;
     else if (next.kind === 'none') hadPr = false;
     $.ui.status(hadPr ? statusText(next) : undefined);
-    syncPoll($);
+    // nor whether to keep polling: a read that fails after a checkout retries
+    if (next.kind !== 'error') syncPoll($);
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({

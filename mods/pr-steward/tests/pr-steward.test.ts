@@ -574,6 +574,37 @@ describe('idle', () => {
     expect(runs.gh).toBeGreaterThanOrEqual(3);
   });
 
+  test('keeps polling when the read after a checkout fails', async ($, on) => {
+    let failing = false;
+    let branch = 'faster-search';
+    let pr: unknown = null;
+    const reads: string[] = [];
+    const clock = fakeHost(on, async argv => {
+      if (argv[0] === 'gh') reads.push('gh');
+      return ghRun(
+        pr,
+        failing ? exited(1, '', 'HTTP 502') : undefined,
+        branch,
+      )(argv);
+    });
+    on('tool.call', { tool: 'Bash' }, () => ({
+      result: { stdout: '', stderr: '', interrupted: false },
+    }));
+    // no PR first stops any poll an earlier test started, so this one runs on this test's clock
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    pr = PR;
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    await clock.advance(1);
+    failing = true;
+    branch = 'other';
+    await $.tool.call({ tool: 'Bash', command: 'git checkout other' });
+    await clock.advance(1);
+    failing = false;
+    reads.length = 0;
+    await clock.advance(3 * 60_000);
+    expect(reads.length).toBeGreaterThanOrEqual(3);
+  });
+
   // last, since the harness can't close the pane and the plugin's state outlives a test
   test('keeps the open pane current while the branch has no PR', async ($, on) => {
     on('ui.open', () => ({ value: undefined }));
