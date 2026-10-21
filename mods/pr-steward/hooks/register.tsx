@@ -20,8 +20,6 @@ const POLL_MS = 60_000;
 const AFTER_PUSH_MS = 15_000;
 
 let latest: Promise<PrSnapshot> | undefined;
-/** Whether the branch last had a PR; a failed read only shows then, not in repos gh can't read at all */
-let hadPr = false;
 /**
  * Nothing runs until the session first uses the plugin (/pull-request, /land,
  * pr_status, a push or gh pr), so sessions that never touch a PR pay nothing.
@@ -31,12 +29,19 @@ let hadPr = false;
 const tracking = {
   used: false,
   paneOpen: false,
+  /**
+   * The branch's PR as last read; a failed read keeps the last answer. A
+   * switch makes it unknown, which keeps polling until a read succeeds. The
+   * status line shows only for a PR, so repos gh can't read stay quiet.
+   */
+  pr: 'none' as 'pr' | 'none' | 'unknown',
   poll: undefined as Timer | undefined,
   /** The branch as last read; undefined until the first read */
   branch: undefined as string | undefined,
 };
 let afterPush: Timer | undefined;
 
+/** Marks the session as using the plugin; every GitHub read does */
 function use($: EngineInterface) {
   if (tracking.used) return;
   tracking.used = true;
@@ -46,7 +51,7 @@ function use($: EngineInterface) {
 
 /** Polls only while there is something to show */
 function syncPoll($: EngineInterface) {
-  if (hadPr || tracking.paneOpen)
+  if (tracking.pr !== 'none' || tracking.paneOpen)
     tracking.poll ??= $.clock.every(POLL_MS, () => void refresh($));
   else {
     tracking.poll?.cancel();
@@ -60,6 +65,7 @@ function syncPoll($: EngineInterface) {
  */
 function refresh($: EngineInterface): Promise<PrSnapshot> {
   const after = latest;
+  use($);
   latest = (async () => {
     await after;
     const previous = (await $.state.get(snapshotRef)).value ?? null;
@@ -68,12 +74,9 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
       path => $.fs.read(path),
     );
     await $.state.set(snapshotRef, next);
-    // a failed read says nothing about the PR, so it keeps the last answer
-    if (next.kind === 'pr') hadPr = true;
-    else if (next.kind === 'none') hadPr = false;
-    $.ui.status(hadPr ? statusText(next) : undefined);
-    // nor whether to keep polling: a read that fails after a checkout retries
-    if (next.kind !== 'error') syncPoll($);
+    if (next.kind !== 'error') tracking.pr = next.kind;
+    $.ui.status(tracking.pr === 'pr' ? statusText(next) : undefined);
+    syncPoll($);
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({
@@ -92,7 +95,6 @@ async function markReady($: EngineInterface) {
 
 /** Asks the model to land the PR; without one, says why not */
 async function land($: EngineInterface): Promise<string> {
-  use($);
   const snapshot = await refresh($);
   if (snapshot.kind !== 'pr') return summary(snapshot);
   await $.prompt.submit({ text: landPrompt(snapshot) });
@@ -103,8 +105,9 @@ let branchQueue: Promise<void> | undefined;
 
 /**
  * Refreshes at once when Claude switched branches, so the pane never shows the
- * old branch's PR. Any command can switch (aliases, scripts), so this runs a
- * local git read after each one; reads run in order so a stale one can't win.
+ * old branch's PR. Any command can switch (aliases, scripts), so once the
+ * session has used the plugin this runs a local git read after each one;
+ * reads run in order so a stale one can't win.
  */
 function checkBranch($: EngineInterface) {
   const after = branchQueue;
@@ -120,7 +123,7 @@ function checkBranch($: EngineInterface) {
     const now = ran.stdout.trim();
     const switched = tracking.branch !== undefined && now !== tracking.branch;
     tracking.branch = now;
-    if (switched) hadPr = false;
+    if (switched) tracking.pr = 'unknown';
     // not awaited: the next branch read shouldn't wait on GitHub
     if (switched) void refresh($);
   })().catch(() => undefined);
@@ -151,8 +154,6 @@ export const register: Register = on => {
   on('command.run', { command: 'pull-request' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE });
     tracking.paneOpen = true;
-    use($);
-    syncPoll($);
     void refresh($);
     return { text: 'Opened the pull request pane.' };
   });
@@ -161,10 +162,9 @@ export const register: Register = on => {
     return { text: await land($) };
   });
 
-  on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => {
-    use($);
-    return { result: summary(await refresh($)) };
-  });
+  on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => ({
+    result: summary(await refresh($)),
+  }));
 
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
@@ -172,6 +172,7 @@ export const register: Register = on => {
     if (tracking.used) void checkBranch($);
     const git = ran.isError ? undefined : ran.result?.gitOperation;
     if (git?.push || git?.pr) {
+      // its read waits for CI, but the branch is followed from now
       use($);
       afterPush?.cancel();
       afterPush = $.clock.after(AFTER_PUSH_MS, () => void refresh($));
@@ -184,7 +185,7 @@ export const register: Register = on => {
     tracking.paneOpen = false;
     syncPoll($);
     return closed;
-   }).catch(($, e, next) => next(e));
+  }).catch(($, e, next) => next(e));
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Link } = $.ui.resolve(e);
