@@ -489,7 +489,8 @@ describe('refreshes', () => {
         gitOperation: operation,
       },
     }));
-    // the first command learns the branch
+    // asking about the PR starts tracking it; the first command learns the branch
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
     await $.tool.call({ tool: 'Bash', command: 'true' });
     await clock.advance(1);
     reads.length = 0;
@@ -519,5 +520,35 @@ describe('refreshes', () => {
 
   test('not after other commands', async ($, on) => {
     expect(await bash($, on)).toEqual({ atOnce: 0, after15s: 0 });
+  });
+});
+
+describe('idle', () => {
+  /** Every process the plugin runs, after a read that finds `pr` */
+  async function runsAfter($: any, on: On, pr: unknown) {
+    const runs: string[] = [];
+    const clock = fakeHost(on, async argv => {
+      runs.push(argv[0]);
+      return ghRun(pr)(argv);
+    });
+    on('tool.call', { tool: 'Bash' }, () => ({
+      result: { stdout: '', stderr: '', interrupted: false },
+    }));
+    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    await clock.advance(1);
+    runs.length = 0;
+    await $.tool.call({ tool: 'Bash', command: 'ls' });
+    await clock.advance(3 * 60_000);
+    return runs;
+  }
+
+  test('runs nothing once the branch has no PR', async ($, on) => {
+    expect(await runsAfter($, on, null)).toEqual([]);
+  });
+
+  test('polls and follows the branch while it has one', async ($, on) => {
+    const runs = await runsAfter($, on, PR);
+    expect(runs.filter(r => r === 'gh').length).toBeGreaterThanOrEqual(3);
+    expect(runs).toContain('git');
   });
 });

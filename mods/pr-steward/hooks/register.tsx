@@ -22,6 +22,25 @@ const AFTER_PUSH_MS = 15_000;
 let latest: Promise<PrSnapshot> | undefined;
 /** Whether the branch last had a PR; a failed read only shows then, not in repos gh can't read at all */
 let hadPr = false;
+/**
+ * Polls while tracking a PR, which starts when someone asks about it
+ * (/pull-request, /land, pr_status) or pushes, and stops once the branch has
+ * none; until then the plugin runs nothing, so sessions that never touch a PR
+ * pay nothing.
+ */
+let poll: Timer | undefined;
+let afterPush: Timer | undefined;
+let branch: string | undefined;
+
+function track($: EngineInterface) {
+  poll ??= $.clock.every(POLL_MS, () => void refresh($));
+}
+
+function untrack() {
+  poll?.cancel();
+  poll = undefined;
+  branch = undefined;
+}
 
 /**
  * Reads the PR through gh; reads run one after another, so each caller sees
@@ -41,6 +60,7 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     if (next.kind === 'pr') hadPr = true;
     else if (next.kind === 'none') hadPr = false;
     $.ui.status(hadPr ? statusText(next) : undefined);
+    if (!hadPr) untrack();
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({
@@ -61,12 +81,10 @@ async function markReady($: EngineInterface) {
 async function land($: EngineInterface): Promise<string> {
   const snapshot = await refresh($);
   if (snapshot.kind !== 'pr') return summary(snapshot);
+  track($);
   await $.prompt.submit({ text: landPrompt(snapshot) });
   return 'Landing this branch’s pull request.';
 }
-
-let afterPush: Timer | undefined;
-let branch: string | undefined;
 
 let branchQueue: Promise<void> | undefined;
 
@@ -99,7 +117,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await Promise.all([
       $.command.register({
-        name: 'pr',
+        name: 'pull-request',
         description:
           "Show this branch's pull request: CI, review threads, preview",
       }),
@@ -114,14 +132,12 @@ export const register: Register = on => {
         isDeferred: false,
       }),
     ]);
-    $.clock.every(POLL_MS, () => void refresh($));
-    void refresh($);
-    void checkBranch($);
     return next(e);
   });
 
-  on('command.run', { command: 'pr' }, async $ => {
+  on('command.run', { command: 'pull-request' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE });
+    track($);
     void refresh($);
     return { text: 'Opened the pull request pane.' };
   });
@@ -130,16 +146,18 @@ export const register: Register = on => {
     return { text: await land($) };
   });
 
-  on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => ({
-    result: summary(await refresh($)),
-  }));
+  on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => {
+    track($);
+    return { result: summary(await refresh($)) };
+  });
 
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
-    void checkBranch($);
+    if (poll) void checkBranch($);
     const git = ran.isError ? undefined : ran.result?.gitOperation;
     if (git?.push || git?.pr) {
+      track($);
       afterPush?.cancel();
       afterPush = $.clock.after(AFTER_PUSH_MS, () => void refresh($));
     }
