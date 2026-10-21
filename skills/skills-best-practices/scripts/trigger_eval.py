@@ -176,7 +176,7 @@ def main():
     ap.add_argument("--harness", choices=["auto", "cursor", "claude"], default="auto",
                     help="CLI to run: cursor (`agent`) or claude (`claude`); auto picks claude when CLAUDECODE=1 (default auto)")
     ap.add_argument("--model", required=True,
-                    help="Model to test with: a slug from `agent --list-models` (cursor) or an alias such as haiku (claude)")
+                    help="Model to test with: a slug from `agent --list-models` (cursor) or an alias such as sonnet (claude)")
     ap.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"],
                     help="claude only: effort level (cursor encodes effort in the model slug)")
     ap.add_argument("--timeout", type=int, default=180, help="Seconds per run before killing it (default 180)")

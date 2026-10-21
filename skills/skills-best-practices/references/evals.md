@@ -38,7 +38,7 @@ Prompts read like real messages: file paths, column names, personal context, cas
 
 ## 2. Runs
 
-Spawn the with-skill and baseline subagents for every case in the same turn so they finish together. Set every runner's model per the eval-model rule, choosing from the session's available subagent models (in Claude Code, pass `model: haiku` on each Agent call). Grade with a stronger model; the grader's judgment is not what is under test.
+Spawn the with-skill and baseline subagents for every case in the same turn so they finish together. Set every runner's model per the eval-model rule, choosing from the session's available subagent models (in Claude Code, pass `model: sonnet` on each Agent call). Grade with a stronger model; the grader's judgment is not what is under test.
 
 With skill:
 
@@ -59,7 +59,7 @@ Cost and duration depend on the harness:
 | Harness | Subagent result | CLI run with token counts |
 |---|---|---|
 | Cursor | No token or duration fields; the run's own timestamps give duration | `agent -p --output-format json --trust -f --model <cheap model> --workspace <dir> "<prompt>"`; the result event carries `duration_ms` and (undocumented but present) `usage`. Without `-f`, unattended shell steps are denied and results are not comparable to subagent runs |
-| Claude Code | The completion notification reports tokens and `duration_ms`; record them as each run finishes, because they appear nowhere else | From `<dir>`: `claude -p --output-format json --model haiku --effort medium --allowedTools "<tools the case needs>" "<prompt>"`; the result carries `duration_ms`, `usage`, and `total_cost_usd`. Tools left off `--allowedTools` are denied, so results are not comparable to subagent runs until the list covers what the case uses |
+| Claude Code | The completion notification reports tokens and `duration_ms`; record them as each run finishes, because they appear nowhere else | From `<dir>`: `claude -p --output-format json --model sonnet --effort medium --allowedTools "<tools the case needs>" "<prompt>"`; the result carries `duration_ms`, `usage`, and `total_cost_usd`. Tools left off `--allowedTools` are denied, so results are not comparable to subagent runs until the list covers what the case uses |
 
 Either way, pre-approving tools for unattended runs requires the isolation above.
 
