@@ -1,4 +1,4 @@
-# Skill format and locations
+# Skill format
 
 ## Layout
 
@@ -11,44 +11,18 @@ skill-name/
 └── evals/            # optional: evals.json + input files; not loaded by the agent
 ```
 
-## Where skills live
-
-| Scope | Cursor | Claude Code |
-|---|---|---|
-| Project | `.cursor/skills/`, `.agents/skills/`, or `.claude/skills/` | `.claude/skills/` in the start directory and each parent up to the repo root |
-| Personal | `~/.cursor/skills/`, `~/.agents/skills/`, or `~/.claude/skills/` | `~/.claude/skills/` |
-| Plugin | The plugin's `skills/` | The plugin's `skills/`, namespaced `<plugin>:<name>` |
-| Cloud | Only `~/.cursor/skills/` with Sync Skills enabled, or the account store below | Skills enabled on the claude.ai account plus the repo's `.claude/skills/`; `~/.claude/skills/` is not read |
-| Managed | `~/.cursor/skills-cursor/`, plugin caches | Bundled and plugin skills |
-
-Default to `.claude/skills/` (or `~/.claude/skills/`) when a skill must work in both harnesses: Cursor reads it, while Claude Code does not read `.cursor/` or `.agents/` roots. Otherwise use the harness's own root. Never author under a managed location; it is overwritten on update, so copy out instead.
-
-Cursor:
-
-- Walks skill roots recursively, so category folders are fine; the skill's identity is the folder containing `SKILL.md`. A skill present under two roots is discovered twice and competes with itself.
-- A `.cursor/skills/` inside a project subdirectory is auto-scoped to files under it.
-- Unsynced personal skills and `~/.agents/skills/` never reach Cloud Agents, remote SSH, or self-hosted workers. Synced skills stay private; to share with a team, commit a project skill or publish to the team marketplace.
-- Account-synced store: `skills/<name>/` under the user store path listed in the session's "Available persistent agent stores". Cursor's built-in create-skill directs personal skills here and says the store follows the account across machines. Undocumented publicly, so confirm discovery in a fresh chat before relying on it; when no store is listed, use `~/.cursor/skills/`.
-
-Claude Code:
-
-- Documents only `<root>/<name>/SKILL.md`; category folders are undocumented, so keep a skill that must work in both harnesses one level under its root.
-- A `.claude/skills/` below the start directory loads the first time the agent reads or edits a file in that subdirectory, which scopes it like Cursor's subdirectory skills.
-- Plugin skills are namespaced, so a plugin copy and a personal copy of one skill both load and compete on description.
-
 ## Frontmatter
 
 | Field | Rules |
 |---|---|
 | `name` | Required. 1–64 chars, `a-z`, `0-9`, single hyphens, no leading/trailing hyphen. Must equal the folder name. Specific, not `helper`/`utils`. |
-| `description` | Required. ≤1024 chars (open spec; Claude Code truncates `description` plus `when_to_use` at 1536 in its listing). See examples below. |
-| `paths` | Both. Globs; the skill surfaces only when the agent works on matching files. In Cursor, a list or comma-separated string, with `globs` as the legacy alias. |
-| `disable-model-invocation` | Both. `true` = only when the user types `/name`; never auto-applied. |
-| `icon`, `color` | Cursor. Badge when the skill backs a Custom Mode. `color` is one of `default green cyan blue purple magenta orange yellow red brand`; unknown values silently fall back. |
-| `allowed-tools` | Open spec, experimental. Claude Code pre-approves the listed tools while the skill runs; Cursor does not document it, so assume it is ignored there. |
-| `when_to_use`, `user-invocable`, `argument-hint`, `model`, `effort`, `context`, `agent` | Claude Code. `user-invocable: false` hides it from `/`; `context: fork` runs it in a subagent (`agent` picks which). Cursor ignores these, so trigger text belongs in `description`, never only in `when_to_use`. |
+| `description` | Required. ≤1024 chars. See examples below. |
+| `paths` | Globs; the skill surfaces only when the agent works on matching files. |
+| `disable-model-invocation` | `true` = only when the user types `/name`; never auto-applied. |
 | `metadata` | String→string map for anything else. |
-| `license`, `compatibility` | Open spec. `compatibility` (≤500 chars) only for real environment needs. |
+| `license`, `compatibility`, `allowed-tools` | Open spec. `compatibility` (≤500 chars) only for real environment needs; `allowed-tools` is experimental and not honored everywhere. |
+
+Harnesses add fields of their own; the harness documents them. Trigger conditions belong in `description` regardless, since it is the one field every harness routes on.
 
 ```yaml
 # Poor: no trigger, no terms
@@ -85,4 +59,4 @@ Body under ~5000 tokens (~500 lines); references as needed. Content size has no 
 
 ## Invocation
 
-Auto-applied when the description matches (unless disabled). `/name` attaches the skill to one message (`/<plugin>:<name>` for a Claude Code plugin skill). In Cursor, Option/Alt+Enter runs it as a Custom Mode for the session. To confirm discovery, the agent checks that the skill appears in its available-skills list in a fresh session; the user checks Customize → Skills or types `/` in Cursor, or types `/` in Claude Code. Absence means a frontmatter or location error, not a description problem.
+Auto-applied when the description matches (unless disabled); `/name` attaches the skill to one message. To confirm discovery, check that the skill appears in the available-skills list of a fresh session. Absence means a frontmatter or location error, not a description problem.
