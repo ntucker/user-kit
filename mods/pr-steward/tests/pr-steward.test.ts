@@ -594,11 +594,16 @@ describe('idle', () => {
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
     pr = PR;
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    // a command on this branch first, since an earlier test may have left another one learned
+    await $.tool.call({ tool: 'Bash', command: 'true' });
     await clock.advance(1);
+    const before = reads.length;
     failing = true;
-    branch = 'other';
-    await $.tool.call({ tool: 'Bash', command: 'git checkout other' });
+    branch = 'after-checkout';
+    await $.tool.call({ tool: 'Bash', command: 'git checkout after-checkout' });
     await clock.advance(1);
+    // the switch was seen: it read GitHub, and that read failed
+    expect(reads.length).toBe(before + 1);
     failing = false;
     reads.length = 0;
     await clock.advance(3 * 60_000);
