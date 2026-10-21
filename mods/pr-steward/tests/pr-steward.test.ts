@@ -523,31 +523,63 @@ describe('refreshes', () => {
 });
 
 describe('idle', () => {
-  /** Every process the plugin runs, after a read that finds `pr` */
-  async function runsAfter($: any, on: On, pr: unknown) {
+  /** Every process the plugin runs while `act` plays out on `branch`, whose PR is `pr` */
+  async function runsDuring(
+    $: any,
+    on: On,
+    act: (switchTo: (branch: string, pr: unknown) => void) => Promise<void>,
+  ) {
     const runs: string[] = [];
+    let current = { branch: 'faster-search', pr: null as unknown };
     const clock = fakeHost(on, async argv => {
       runs.push(argv[0]);
-      return ghRun(pr)(argv);
+      return ghRun(current.pr, undefined, current.branch)(argv);
     });
     on('tool.call', { tool: 'Bash' }, () => ({
       result: { stdout: '', stderr: '', interrupted: false },
     }));
-    await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    await act((branch, pr) => (current = { branch, pr }));
     await clock.advance(1);
     runs.length = 0;
     await $.tool.call({ tool: 'Bash', command: 'ls' });
     await clock.advance(3 * 60_000);
-    return runs;
+    return {
+      gh: runs.filter(r => r === 'gh').length,
+      git: runs.filter(r => r === 'git').length,
+    };
   }
 
-  test('runs nothing once the branch has no PR', async ($, on) => {
-    expect(await runsAfter($, on, null)).toEqual([]);
+  test('reads nothing from GitHub once the branch has no PR', async ($, on) => {
+    const runs = await runsDuring($, on, () =>
+      $.tool.call({ tool: 'mcp__pr-steward__pr_status' }),
+    );
+    expect(runs.gh).toBe(0);
   });
 
   test('polls and follows the branch while it has one', async ($, on) => {
-    const runs = await runsAfter($, on, PR);
-    expect(runs.filter(r => r === 'gh').length).toBeGreaterThanOrEqual(3);
-    expect(runs).toContain('git');
+    const runs = await runsDuring($, on, async switchTo => {
+      switchTo('faster-search', PR);
+      await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+    });
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
+    expect(runs.git).toBeGreaterThanOrEqual(1);
+  });
+
+  test('picks up a PR on a branch switched to after its last one', async ($, on) => {
+    const runs = await runsDuring($, on, async switchTo => {
+      await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+      switchTo('other', PR);
+    });
+    // one read for the switch, then a poll a minute
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
+  });
+
+  // last, since the harness can't close the pane and the plugin's state outlives a test
+  test('keeps the open pane current while the branch has no PR', async ($, on) => {
+    on('ui.open', () => ({ value: undefined }));
+    const runs = await runsDuring($, on, () =>
+      $.command.run({ command: 'pull-request' }),
+    );
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
   });
 });

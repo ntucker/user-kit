@@ -23,26 +23,35 @@ let latest: Promise<PrSnapshot> | undefined;
 /** Whether the branch last had a PR; a failed read only shows then, not in repos gh can't read at all */
 let hadPr = false;
 /**
- * Polls while tracking a PR, which starts when someone asks about it
- * (/pull-request, /land, pr_status) or pushes, and stops once the branch has
- * none; until then the plugin runs nothing, so sessions that never touch a PR
- * pay nothing.
+ * Nothing runs until the session first uses the plugin (/pull-request, /land,
+ * pr_status, a push or gh pr), so sessions that never touch a PR pay nothing.
+ * From then on a local git read after each command spots branch switches, and
+ * GitHub is polled while the branch has a PR or the pane is open.
  */
-let poll: Timer | undefined;
+const tracking = {
+  used: false,
+  paneOpen: false,
+  poll: undefined as Timer | undefined,
+  /** The branch as last read; undefined until the first read */
+  branch: undefined as string | undefined,
+};
 let afterPush: Timer | undefined;
-let branch: string | undefined;
 
-function track($: EngineInterface) {
-  if (poll) return;
-  poll = $.clock.every(POLL_MS, () => void refresh($));
+function use($: EngineInterface) {
+  if (tracking.used) return;
+  tracking.used = true;
   // learn the branch now, so the next command's checkout counts as a switch
   void checkBranch($);
 }
 
-function untrack() {
-  poll?.cancel();
-  poll = undefined;
-  branch = undefined;
+/** Polls only while there is something to show */
+function syncPoll($: EngineInterface) {
+  if (hadPr || tracking.paneOpen)
+    tracking.poll ??= $.clock.every(POLL_MS, () => void refresh($));
+  else {
+    tracking.poll?.cancel();
+    tracking.poll = undefined;
+  }
 }
 
 /**
@@ -63,7 +72,7 @@ function refresh($: EngineInterface): Promise<PrSnapshot> {
     if (next.kind === 'pr') hadPr = true;
     else if (next.kind === 'none') hadPr = false;
     $.ui.status(hadPr ? statusText(next) : undefined);
-    if (!hadPr) untrack();
+    syncPoll($);
     announce($, previous, next);
     return next;
   })().catch((error): PrSnapshot => ({
@@ -82,9 +91,9 @@ async function markReady($: EngineInterface) {
 
 /** Asks the model to land the PR; without one, says why not */
 async function land($: EngineInterface): Promise<string> {
+  use($);
   const snapshot = await refresh($);
   if (snapshot.kind !== 'pr') return summary(snapshot);
-  track($);
   await $.prompt.submit({ text: landPrompt(snapshot) });
   return 'Landing this branch’s pull request.';
 }
@@ -108,8 +117,8 @@ function checkBranch($: EngineInterface) {
     ]);
     if (ran.exitCode !== 0) return;
     const now = ran.stdout.trim();
-    const switched = branch !== undefined && now !== branch;
-    branch = now;
+    const switched = tracking.branch !== undefined && now !== tracking.branch;
+    tracking.branch = now;
     if (switched) hadPr = false;
     // not awaited: the next branch read shouldn't wait on GitHub
     if (switched) void refresh($);
@@ -140,7 +149,9 @@ export const register: Register = on => {
 
   on('command.run', { command: 'pull-request' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE });
-    track($);
+    tracking.paneOpen = true;
+    use($);
+    syncPoll($);
     void refresh($);
     return { text: 'Opened the pull request pane.' };
   });
@@ -150,22 +161,29 @@ export const register: Register = on => {
   });
 
   on('tool.call', { tool: 'mcp__pr-steward__pr_status' }, async $ => {
-    track($);
+    use($);
     return { result: summary(await refresh($)) };
   });
 
   // A failure here must not block Bash; .catch's next(e) replays the settled call, never running it twice
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e);
-    if (poll) void checkBranch($);
+    if (tracking.used) void checkBranch($);
     const git = ran.isError ? undefined : ran.result?.gitOperation;
     if (git?.push || git?.pr) {
-      track($);
+      use($);
       afterPush?.cancel();
       afterPush = $.clock.after(AFTER_PUSH_MS, () => void refresh($));
     }
     return ran;
   }).catch(($, e, next) => next(e));
+
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const closed = await next(e);
+    tracking.paneOpen = false;
+    syncPoll($);
+    return closed;
+   }).catch(($, e, next) => next(e));
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button, Link } = $.ui.resolve(e);

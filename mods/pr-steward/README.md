@@ -8,7 +8,7 @@ Keeps the current branch's pull request in view while you work in Claude Code.
 - **`/land`**: asks Claude to drive the PR to mergeable: conflicts, then failing checks, then review threads (verifying each claim against the code), then the repository's own steps and marking it ready.
 - **`pr_status` tool**: Claude reads the same state instead of re-querying GitHub.
 
-It stays idle until a session uses it: nothing runs until `/pull-request`, `/land`, `pr_status`, a `git push` or a `gh pr` command, and it stops again once the branch has no PR. A session that never touches a PR runs no `gh` or `git` commands.
+It stays idle until a session uses it: nothing runs until `/pull-request`, `/land`, `pr_status`, a `git push` or a `gh pr` command, so a session that never touches a PR runs no `gh` or `git` commands. From then on it reads the branch locally after each command, and polls GitHub only while the branch has a PR or the pane is open.
 
 Needs the [`gh` CLI](https://cli.github.com/), signed in. Works in any GitHub repository.
 
