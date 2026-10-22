@@ -136,6 +136,37 @@ const readConfig = async (path: string) => {
   throw new Error('ENOENT');
 };
 
+/**
+ * A host whose branch, PR and gh failure a test can change mid-run, with a
+ * Bash that reports `gitOperation()`; records each process the plugin runs
+ */
+function liveHost(on: On, gitOperation?: () => object | undefined) {
+  const state = {
+    branch: 'faster-search',
+    pr: null as unknown,
+    failure: undefined as ReturnType<typeof exited> | undefined,
+  };
+  const runs: string[] = [];
+  const clock = fakeHost(on, async argv => {
+    runs.push(argv[0]);
+    return ghRun(state.pr, state.failure, state.branch)(argv);
+  });
+  on('tool.call', { tool: 'Bash' }, () => ({
+    result: {
+      stdout: '',
+      stderr: '',
+      interrupted: false,
+      gitOperation: gitOperation?.(),
+    },
+  }));
+  const count = (command: 'gh' | 'git') =>
+    runs.filter(r => r === command).length;
+  return { state, runs, clock, count };
+}
+
+const prStatus = ($: any) =>
+  $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
+
 /** The prompts the mod submits, in order */
 function capturePrompts(on: On) {
   const prompts: string[] = [];
@@ -474,33 +505,21 @@ describe('toasts', () => {
 describe('refreshes', () => {
   /** Runs one Bash command whose result reports `gitOperation`, on `branch` afterwards */
   async function bash($: any, on: On, gitOperation?: object, branch?: string) {
-    const reads: string[] = [];
-    let current = 'faster-search';
-    const clock = fakeHost(on, async argv => {
-      if (argv[0] === 'gh') reads.push('gh');
-      return ghRun(PR, undefined, current)(argv);
-    });
     let operation: object | undefined;
-    on('tool.call', { tool: 'Bash' }, () => ({
-      result: {
-        stdout: '',
-        stderr: '',
-        interrupted: false,
-        gitOperation: operation,
-      },
-    }));
-    // the first command learns the branch
-    await $.tool.call({ tool: 'Bash', command: 'true' });
-    await clock.advance(1);
-    reads.length = 0;
+    const host = liveHost(on, () => operation);
+    host.state.pr = PR;
+    // asking about the PR starts tracking it, which learns the branch
+    await prStatus($);
+    await host.clock.advance(1);
+    host.runs.length = 0;
     operation = gitOperation;
-    if (branch) current = branch;
+    if (branch) host.state.branch = branch;
     await $.tool.call({ tool: 'Bash', command: 'x' });
-    await clock.advance(1);
-    const atOnce = reads.length;
+    await host.clock.advance(1);
+    const atOnce = host.count('gh');
     // CI needs a moment to register a push's checks
-    await clock.advance(15_000);
-    return { atOnce, after15s: reads.length - atOnce };
+    await host.clock.advance(15_000);
+    return { atOnce, after15s: host.count('gh') - atOnce };
   }
 
   test('15s after a push', async ($, on) => {
@@ -519,5 +538,77 @@ describe('refreshes', () => {
 
   test('not after other commands', async ($, on) => {
     expect(await bash($, on)).toEqual({ atOnce: 0, after15s: 0 });
+  });
+});
+
+describe('idle', () => {
+  /** The processes run over three minutes and one more command, once `start` has run */
+  async function runsAfter(
+    $: any,
+    host: ReturnType<typeof liveHost>,
+    start: () => Promise<unknown>,
+  ) {
+    await start();
+    await host.clock.advance(1);
+    host.runs.length = 0;
+    await $.tool.call({ tool: 'Bash', command: 'ls' });
+    await host.clock.advance(3 * 60_000);
+    return { gh: host.count('gh'), git: host.count('git') };
+  }
+
+  test('reads nothing from GitHub once the branch has no PR', async ($, on) => {
+    const host = liveHost(on);
+    expect((await runsAfter($, host, () => prStatus($))).gh).toBe(0);
+  });
+
+  test('polls and follows the branch while it has one', async ($, on) => {
+    const host = liveHost(on);
+    host.state.pr = PR;
+    const runs = await runsAfter($, host, () => prStatus($));
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
+    expect(runs.git).toBeGreaterThanOrEqual(1);
+  });
+
+  test('picks up a PR on a branch switched to after its last one', async ($, on) => {
+    const host = liveHost(on);
+    const runs = await runsAfter($, host, async () => {
+      await prStatus($);
+      host.state.branch = 'switched-to';
+      host.state.pr = PR;
+    });
+    // one read for the switch, then a poll a minute
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
+  });
+
+  test('keeps polling when the read after a checkout fails', async ($, on) => {
+    const host = liveHost(on);
+    // no PR first stops any poll an earlier test started, so this one runs on this test's clock
+    await prStatus($);
+    host.state.pr = PR;
+    await prStatus($);
+    // a command on this branch first, since an earlier test may have left another one learned
+    await $.tool.call({ tool: 'Bash', command: 'true' });
+    await host.clock.advance(1);
+    const before = host.count('gh');
+    host.state.failure = exited(1, '', 'HTTP 502');
+    host.state.branch = 'after-checkout';
+    await $.tool.call({ tool: 'Bash', command: 'git checkout after-checkout' });
+    await host.clock.advance(1);
+    // the switch was seen: it read GitHub, and that read failed
+    expect(host.count('gh')).toBe(before + 1);
+    host.state.failure = undefined;
+    host.runs.length = 0;
+    await host.clock.advance(3 * 60_000);
+    expect(host.count('gh')).toBeGreaterThanOrEqual(3);
+  });
+
+  // last, since the harness can't close the pane and the plugin's state outlives a test
+  test('keeps the open pane current while the branch has no PR', async ($, on) => {
+    on('ui.open', () => ({ value: undefined }));
+    const host = liveHost(on);
+    const runs = await runsAfter($, host, () =>
+      $.command.run({ command: 'pull-request' }),
+    );
+    expect(runs.gh).toBeGreaterThanOrEqual(3);
   });
 });
