@@ -2,7 +2,7 @@
 export const meta = {
   name: "post-push-review",
   description:
-    "Parallel Haiku review of a pushed diff: goals, engineering, adversarial, reuse, and React data flow",
+    "Parallel Haiku review of a pushed diff: goals, repo rules, engineering, adversarial, reuse, and React data flow",
   whenToUse:
     'After pushing commits, in any git repo. args: { range, goals?, repo? } or just the range string. range covers only the pushed commits: "<sha before push>..HEAD", or "origin/<default branch>...HEAD" (three dots) for a whole branch. goals: the goals this work serves, as text (from your project instructions or memory); the repo\'s own goal docs are read as well. repo: absolute path to the repository when it is not the working directory. Returns unverified findings; the caller verifies each one.',
   phases: [{ title: "Review", model: "haiku" }],
@@ -97,6 +97,15 @@ const REVIEWERS = [
     prompt: brief(`Focus: does the change serve the project's goals?
 ${GOALS}
 Flag anything that works against a goal (for example added complexity, new dependencies, weaker types or guarantees, worse performance, or code harder for people or agents to understand), and changes that miss what the commits say they set out to do.`),
+  },
+  {
+    name: "rules",
+    prompt: brief(`Focus: did the change follow the repo's own agent rules?
+Before reading the diff closely, load every rule an agent working in this repo was meant to follow:
+- AGENTS.md, CLAUDE.md and GEMINI.md at the root and in every directory above a changed file.
+- Every file in .claude/rules/, .cursor/rules/ (including .cursor/rules/ folders nested in subdirectories) and .github/copilot-instructions.md. Path-scoped rules (frontmatter \`paths\` or \`globs\`) apply when a changed file matches; \`alwaysApply\` rules always do.
+- Every skill, doc or checklist those rules point to for a task this diff performs (for example "see skill X for the full workflow"), wherever it lives (.agents/skills, .claude/skills, .cursor/skills or skills/), even one marked disable-model-invocation. Follow those pointers one level deep.
+Then check the diff against each required step that applies to what it does. Flag each step the change skipped or got wrong (a file it should have updated, a check it should have added, a format it should have used), naming the rule file and quoting the step. A rule can require work outside the files the diff touched, such as docs, a changelog or release notes to update when a changeset is added, so check for that work in the diff. Skip a rule when the diff does nothing it governs. With no rule files, return skipped: true with the reason.`),
   },
   {
     name: "engineering",
