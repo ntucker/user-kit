@@ -1,6 +1,6 @@
 ---
 name: react-19-2
-description: React 19.2 APIs that replace common legacy patterns: <Activity> (hide UI but keep its state and DOM, pre-render likely-next content, hydrate sections independently), useEffectEvent (Effects that read the latest props or state without resubscribing), cacheSignal (abort Server Component fetch/DB work), Chrome DevTools Performance Tracks, and prerender/resume partial pre-rendering. Use in React projects that may be on 19.2+ (the skill checks first) whenever the task involves UI that toggles and should come back as left (tabs, sidebars, drawers, modals, wizards, master-detail, form drafts, video or map instances), prefetching the next view, an Effect that reconnects, resubscribes, or reads stale values (sockets, timers, listeners, analytics, third-party callbacks), an exhaustive-deps disable or latest-ref/useEvent hack, slow or cascading renders, or a static-shell SSR setup, even when the user never names these APIs. Also use when upgrading to React 19.2 or later from an earlier version.
+description: React 19.2 APIs that replace common legacy patterns: <Activity> (hide UI but keep its state and DOM, pre-render likely-next content, hydrate sections independently), useEffectEvent (Effects that read the latest props or state without resubscribing), cacheSignal (abort Server Component fetch/DB work), Chrome DevTools Performance Tracks, and prerender/resume partial pre-rendering. Use in React projects that may be on 19.2+ (the skill checks first) whenever the task involves UI that toggles and should come back as left (tabs, sidebars, drawers, modals, wizards, master-detail, form drafts, video or map instances), prefetching the next view, an Effect that reconnects, resubscribes, or reads stale values (sockets, timers, listeners, analytics, third-party callbacks), an exhaustive-deps disable or latest-ref/useEvent hack, slow or cascading renders, or a static-shell SSR setup, even when the user never names these APIs. Also use when upgrading from a React version before 19.2.
 ---
 
 # React 19.2
@@ -9,7 +9,7 @@ Stable in 19.2: `<Activity>`, `useEffectEvent`, `cacheSignal`, React Performance
 
 ## Step 0: Confirm the version
 
-Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply the `react-19-3` skill (`<ViewTransition>`, Fragment refs, `browser()`).
+Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply skill "react-19-3" (`<ViewTransition>`, Fragment refs, `browser()`).
 
 ## Feature selection
 

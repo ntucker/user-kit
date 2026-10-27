@@ -15,7 +15,7 @@ Require `>= 19.3.0`. A `19.3.0-canary-*` build is a snapshot from its date and c
 
 If the version is older, do not emit these APIs: say the feature needs 19.3, offer the upgrade, and use a pre-19.3 fallback only if the user declines.
 
-19.3 includes everything in 19.2. If the task would also benefit from a 19.2 API (`<Activity>`, `useEffectEvent`, `cacheSignal`, partial pre-rendering), apply the `react-19-2` skill too; otherwise leave it out.
+19.3 includes everything in 19.2. If the task would also benefit from a 19.2 API (`<Activity>`, `useEffectEvent`, `cacheSignal`, partial pre-rendering), apply skill "react-19-2" too; otherwise leave it out.
 
 ## Feature selection
 
