@@ -23,7 +23,7 @@ These constraints are the contract for anyone editing this tree. A change that v
 
 ## Claude Code
 
-9. **The same tree is a Claude Code plugin.** It loads `skills/` directly, so skills are shared as-is. It also loads `workflows/*.js` as `user-kit:<name>` workflows, which are Claude-only.
-10. **`claude/agents/` and `claude/skills/` are generated.** Edit `agents/`, then run `python3 scripts/build_claude_agents.py`. It also rewrites the `agents` and `skills` lists in `.claude-plugin/plugin.json`. Never hand-edit either. CI regenerates them on `main` when a sync pushes `agents/` changes without them.
+9. **The Claude Code plugin is `claude/`, not the repo root.** `.claude-plugin/marketplace.json` points `user-kit` at `./claude`, so no Claude surface sees the Cursor `agents/` beside the Claude copies. Skills are shared as-is: `claude/skills/` mirrors `skills/`. `workflows/*.js` load as `user-kit:<name>` workflows, which are Claude-only.
+10. **Everything in `claude/` except `.claude-plugin/plugin.json` is generated.** Edit `agents/`, `skills/`, or `workflows/`, then run `python3 scripts/build_claude_plugin.py`. Never hand-edit the copies. CI regenerates them on `main` when a sync pushes source changes without them.
 
 Adding files for another tool is fine when it does not rename, move, or replace the Cursor manifest, `skills/`, or `agents/`.

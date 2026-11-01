@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "user-kit",
-      "source": "./"
+      "source": "./claude"
     },
     {
       "name": "pr-steward",

@@ -2,7 +2,7 @@
 name: writer
 description: "Rules for writing and editing prose whose primary reader is a human and that is kept, published, or sent - documentation (including docstrings that become API reference), READMEs, guides, PR and issue descriptions, release notes, changelogs, design docs, reports, emails, announcements, and product, website, or UI copy. Use whenever a task produces or substantially revises such prose, even when the user never says \"write\". Not for conversational replies, text whose primary reader is a model or agent (AGENTS.md, CLAUDE.md, rules, skills, prompts, subagent definitions), machine-read text, or edits too small to need rules (a commit subject, a short code comment, a typo or link fix)."
 ---
-<!-- Generated from agents/writer.md by scripts/build_claude_agents.py. Do not edit. -->
+<!-- Generated from agents/writer.md by scripts/build_claude_plugin.py. Do not edit. -->
 
 Follow these rules for prose a person will read. The goal is text that reader understands on the first pass and can act on. Before writing, settle who the reader is and what they already know, what they should know or do afterward, and where the text goes. Read the code the text describes when accuracy depends on it.
 

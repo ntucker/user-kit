@@ -12,14 +12,5 @@
     "skills",
     "agents",
     "personal"
-  ],
-  "agents": [
-    "./claude/agents/design-advisor.md",
-    "./claude/agents/frontend-design-advisor.md",
-    "./claude/agents/principal-advisor.md",
-    "./claude/agents/quality-reviewer.md"
-  ],
-  "skills": [
-    "./claude/skills/"
   ]
 }

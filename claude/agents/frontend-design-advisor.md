@@ -4,7 +4,7 @@ description: Visual design specialist - layout, spacing, color, typography, moti
 model: claude-opus-5-5
 effort: high
 ---
-<!-- Generated from agents/frontend-design-advisor.md by scripts/build_claude_agents.py. Do not edit. -->
+<!-- Generated from agents/frontend-design-advisor.md by scripts/build_claude_plugin.py. Do not edit. -->
 
 You are the frontend design advisor. An implementing agent hands you the visual layer of its task. Your product is a correct, specific visual outcome: code you write into the repository, or a spec exact enough to reproduce without design judgment.
 

@@ -1,0 +1,91 @@
+[
+  {
+    "query": "I keep having to tell the agent to run `yarn changeset` and pick the right bump type after every package change. can you make it do that consistently without me asking?",
+    "should_trigger": true
+  },
+  {
+    "query": "we have a skill at .cursor/skills/deploy-staging/SKILL.md but the agent never seems to use it when I ask it to push to staging. what's wrong with it?",
+    "should_trigger": true
+  },
+  {
+    "query": "turn what we just did in this conversation (the whole migration procedure with the three gotchas) into something reusable for the team",
+    "should_trigger": true
+  },
+  {
+    "query": "audit ~/.cursor/skills/pr-review/SKILL.md - it's 900 lines and I think half of it is junk",
+    "should_trigger": true
+  },
+  {
+    "query": "is the description on my csv-analyzer skill any good? it fires when people ask about excel formulas which is annoying",
+    "should_trigger": true
+  },
+  {
+    "query": "I have two skills, data-client-rest and data-client-rest-setup, and they overlap a lot. should I merge them or split them differently?",
+    "should_trigger": true
+  },
+  {
+    "query": "write a SKILL.md for our storybook conventions. frontmatter and all. it should only kick in when editing *.stories.tsx files",
+    "should_trigger": true
+  },
+  {
+    "query": "does my new testing skill actually help or would the agent do the same thing without it? how would I even check",
+    "should_trigger": true
+  },
+  {
+    "query": "convert .cursor/commands/release.md into a skill, keep it so it only runs when I type /release",
+    "should_trigger": true
+  },
+  {
+    "query": "run evals on .cursor/skills/data-client-schema with and without the skill and tell me the pass rate delta",
+    "should_trigger": true
+  },
+  {
+    "query": "where should a personal skill go so it works in cloud agents too? and does the folder name have to match the name field",
+    "should_trigger": true
+  },
+  {
+    "query": "add a cursor rule that always applies telling the agent to use pnpm instead of npm in this repo",
+    "should_trigger": false
+  },
+  {
+    "query": "write a hook that runs prettier after every file edit the agent makes",
+    "should_trigger": false
+  },
+  {
+    "query": "create a subagent that does security review of diffs, with its own system prompt",
+    "should_trigger": false
+  },
+  {
+    "query": "update AGENTS.md with the new test naming convention (*.node.test.ts for node tests)",
+    "should_trigger": false
+  },
+  {
+    "query": "the docs for our resource() API are out of date, can you rewrite docs/rest/resource.md to match the current signature",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I install the skill-creator plugin from the cursor marketplace",
+    "should_trigger": false
+  },
+  {
+    "query": "the agent keeps forgetting to run tests before committing in this chat. remind it every time",
+    "should_trigger": false
+  },
+  {
+    "query": "write a README for the packages/react folder explaining the hooks",
+    "should_trigger": false
+  },
+  {
+    "query": "summarize what agentskills.io says about progressive disclosure, I'm writing a blog post",
+    "should_trigger": true,
+    "note": "Relabeled after iteration 1: the skill holds the relevant expertise; consulting it here is correct."
+  },
+  {
+    "query": "our MCP server for Linear isn't showing up in cursor, mcp.json looks right to me",
+    "should_trigger": false
+  },
+  {
+    "query": "delete the unused .cursor/skills/old-deploy folder and remove the one line in AGENTS.md that mentions it",
+    "should_trigger": false
+  }
+]
