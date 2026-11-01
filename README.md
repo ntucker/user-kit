@@ -51,35 +51,37 @@ Commit this to that repo's `.claude/settings.json`. Claude Code then offers to i
 
 ### Live from your own checkout (authoring)
 
-A marketplace added from a local path loads in place, so edits apply on the next session or `/reload-plugins` with no update step. Point it at the Cursor clone so both tools read the same files:
+A marketplace added from a local path loads the plugin in place, so edits apply on the next session or `/reload-plugins` with no update step. Point it at the Cursor clone so both tools read the same files:
 
 ```sh
 claude plugin marketplace add ~/.cursor/plugins/local/user-kit
 claude plugin install user-kit@user-kit --scope user
 ```
 
-Use this instead of the GitHub marketplace on the authoring machine, not alongside it, since both are named `user-kit`. For a one-off session, `claude --plugin-dir ~/.cursor/plugins/local/user-kit` also works.
+Use this instead of the GitHub marketplace on the authoring machine, not alongside it, since both are named `user-kit`. For a one-off session, `claude --plugin-dir ~/.cursor/plugins/local/user-kit/claude` also works. Either way, run the build script below after editing, since Claude Code reads the copies in `claude/`.
 
 ## Layout
 
 - `skills/<name>/SKILL.md` — personal skills, shared by Cursor and Claude Code
 - `agents/<name>.md` — subagents, in Cursor frontmatter
-- `claude/agents/<name>.md` — generated Claude Code copies of `agents/` (minus Cursor-only agents on non-Claude models)
-- `claude/skills/<name>/SKILL.md` — generated Claude Code skills from agents that opt in, for instructions Claude should follow in its own context (Cursor ignores them)
+- `claude/` — the Claude Code plugin, generated except for its `.claude-plugin/plugin.json`:
+  - `claude/agents/<name>.md` — Claude Code copies of `agents/` (minus Cursor-only agents on non-Claude models)
+  - `claude/skills/` — a mirror of `skills/`, plus skills generated from agents that opt in, for instructions Claude should follow in its own context (Cursor ignores them)
+  - `claude/workflows/` — a mirror of `workflows/`
 - `workflows/<name>.js` — Claude Code Workflow scripts, run as `user-kit:<name>` (Cursor ignores them)
 - `mods/<name>/` — Claude Code mods, each its own plugin in the Claude marketplace (install `<name>@user-kit`; Cursor ignores them)
 - `.cursor-plugin/` — Cursor manifest and marketplace
-- `.claude-plugin/` — Claude Code manifest and marketplace
+- `.claude-plugin/` — Claude Code marketplace
 
-### Editing subagents
+### Editing skills, subagents, and workflows
 
-Edit `agents/<name>.md`, then run:
+Edit `skills/`, `agents/`, or `workflows/`, then run:
 
 ```sh
-python3 scripts/build_claude_agents.py
+python3 scripts/build_claude_plugin.py
 ```
 
-It writes the Claude Code copies and their list in `.claude-plugin/plugin.json`. The script's docstring explains why the copies exist. On pull requests CI fails when they are stale. On `main`, where `cursor-skills-sync` pushes without running the script, CI regenerates and commits them.
+It rebuilds the Claude Code plugin in `claude/`. The script's docstring explains why the plugin lives there. On pull requests CI fails when they are stale. On `main`, where `cursor-skills-sync` pushes without running the script, CI regenerates and commits them.
 
 ## License
 

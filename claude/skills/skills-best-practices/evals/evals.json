@@ -1,0 +1,56 @@
+{
+  "skill_name": "skills-best-practices",
+  "evals": [
+    {
+      "id": 1,
+      "name": "audit-flawed-skill",
+      "prompt": "Audit the supplied deploy-helper skill folder. Write your findings to <outputs>/audit.md as a prioritized list; for each finding say what is wrong, why it matters, and the concrete fix.",
+      "expected_output": "A prioritized audit report that catches the planted defects, contains no false positives, reports validator results, and proposes a description with a trigger clause, indirect cases, and a boundary.",
+      "files": [
+        "evals/files/deploy-helper/SKILL.md",
+        "evals/files/deploy-helper/references/aws.md",
+        "evals/files/deploy-helper/references/aws-iam.md"
+      ],
+      "assertions": [
+        "Flags that the name `deploy_helper` is invalid (underscore) AND that it does not match the folder `deploy-helper`",
+        "Flags that the description 'Helps with deployments.' lacks trigger conditions, and the proposed replacement contains a semantic trigger clause, at least one indirect phrasing, and a boundary clause",
+        "Flags the body 'When to Use' section as unable to affect auto-triggering and says trigger text belongs in the description",
+        "Flags the staging/production contradiction AND resolves it as an explicit conditional rule (hotfix vs. normal) rather than just deleting one side",
+        "Flags the migrations contradiction (NEVER run vs. deploy script runs them) and proposes a resolution",
+        "Flags the time-relative Q3 2026 instruction and recommends stating the current method with legacy collapsed",
+        "Flags the missing referenced file references/gcp.md",
+        "Flags the ungated 'See references/ for details' pointer AND the reference chain aws.md -> aws-iam.md, recommending gating by condition and one level deep",
+        "Flags the Kubernetes/Helm background paragraph as known to the agent (wasted tokens)",
+        "Flags the tool menu (kubectl / helm / deploy script) and recommends a single default with a gated alternative",
+        "Flags that the /health gotcha buried in references/aws.md contradicts the body's verification step and recommends moving it into SKILL.md",
+        "Reports the output of the structural validator (validate_skill.py or equivalent) as part of the audit",
+        "Contains no false-positive findings: does not report as broken anything that is valid under skill-root-relative resolution (e.g., the aws.md -> aws-iam.md link path itself)",
+        "Findings are ordered with behavior-affecting contradictions ranked above formatting/convention issues"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "create-branching-release-skill",
+      "prompt": "Create a project skill for our release process in <fixture>/.cursor/skills/. The process differs by what changed: for anything under packages/* we use changesets (`yarn changeset`, but it's interactive so the file has to be written by hand; core packages are version-linked so bumping one bumps them all; internal-only changes get no changeset); for examples/* there is no release but the example's lockfile must be refreshed with `yarn install --mode=update-lockfile`; for website/ we run `yarn workspace rdc-website build` and then `netlify deploy --prod`; docs-only changes just need `yarn workspace rdc-website typecheck` to pass. It should kick in automatically whenever someone talks about releasing, publishing, shipping, or cutting a version, even if they don't say 'release'. Write it as a complete skill folder.",
+      "expected_output": "A concise skill folder whose SKILL.md has valid frontmatter, a description with trigger clause and indirect phrasings, the four-way branch encoded once as a decision table, gotchas in the body, gated concept-named reference links, exact commands from the prompt, and nothing the prompt did not ask for.",
+      "files": [],
+      "assertions": [
+        "A SKILL.md exists in a folder whose name equals the frontmatter `name`, and the name is lowercase-hyphenated",
+        "The description contains a semantic trigger clause that names release/publish/ship/version and at least one indirect case (e.g., 'even if they don't say release')",
+        "The four branches (packages, examples, website, docs-only) are encoded as a table or explicit condition -> action structure",
+        "Each branch's procedure is encoded once; the same branch logic does not appear again as prose subsections and again as a checklist",
+        "The SKILL.md body is at most 70 lines",
+        "There is no 'When to Use' section in the body",
+        "The version-linked core packages fact appears as a gotcha or equivalent explicit correction in SKILL.md",
+        "The packages branch says `yarn changeset` is interactive and directs the agent to write the changeset file manually instead of running the command",
+        "The packages branch says internal-only changes receive no changeset",
+        "The body does not explain what changesets, Netlify, or lockfiles are",
+        "All four non-interactive branch commands appear exactly as given in the prompt (`yarn install --mode=update-lockfile`, `yarn workspace rdc-website build`, `netlify deploy --prod`, `yarn workspace rdc-website typecheck`)",
+        "Any reference files live under references/, are introduced with a condition, and are linked as [Concept Name](references/file.md) with concept text rather than the path; if none exist, this passes",
+        "No procedures or rules are added beyond what the prompt specified (e.g., no invented CI steps, status commands, or docs-in-same-PR rules)",
+        "There are no ALL-CAPS MUST/NEVER directives without an accompanying reason",
+        "The skill's own `scripts/validate_skill.py`, run against the created folder, exits 0 with no convention warnings"
+      ]
+    }
+  ]
+}

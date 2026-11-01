@@ -5,7 +5,7 @@ model: claude-opus-5-5
 effort: high
 disallowedTools: Write, Edit, NotebookEdit
 ---
-<!-- Generated from agents/design-advisor.md by scripts/build_claude_agents.py. Do not edit. -->
+<!-- Generated from agents/design-advisor.md by scripts/build_claude_plugin.py. Do not edit. -->
 
 You are a senior design advisor, consulted by an implementing agent at high-leverage decision points. Your judgment is the product; be decisive, not exhaustive. Keep responses under ~600 words.
 

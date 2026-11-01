@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
-"""Generate Claude Code copies of the Cursor subagents.
+"""Build the Claude Code plugin in `claude/` from the Cursor tree.
 
-`agents/*.md` keeps Cursor frontmatter (`model: claude-opus-5-5[effort=high]`),
-which Claude Code sends to the API verbatim and gets a 404. This writes
-`claude/agents/<name>.md` with `model` and `effort` split and Cursor's
-`readonly: true` expressed as `disallowedTools`, and points
-`.claude-plugin/plugin.json` at those files so Claude Code skips `agents/`.
-An agent on another provider's model (Gemini, GPT) is Cursor-only and gets no copy.
+The plugin root is `claude/`, not the repo root, because Claude surfaces that
+scan a plugin's default `agents/` directory (the claude.ai plugin page does,
+even when the manifest lists other files) would otherwise list every agent
+twice and could run the Cursor copy. So `claude/` holds:
+
+- `agents/<name>.md`: Claude Code copies of `agents/*.md`. Cursor frontmatter
+  (`model: claude-opus-5-5[effort=high]`) is sent to the API verbatim and 404s,
+  so `model` and `effort` are split and Cursor's `readonly: true` becomes
+  `disallowedTools`. An agent on another provider's model (Gemini, GPT) is
+  Cursor-only and gets no copy.
+- `skills/` and `workflows/`: byte-for-byte mirrors of the shared sources.
+- `.claude-plugin/plugin.json`: hand-written, with no component lists, since
+  the defaults above are exactly the plugin's contents.
 
 An agent can also ship its instructions to Claude Code as a skill, for when a
 subagent on the session's own model would only lose the conversation's context.
@@ -22,24 +29,27 @@ Its body then carries markers, which Cursor reads as HTML comments:
 
 The skill is written to `claude/skills/<name>/SKILL.md`, which Cursor does not load.
 
-    python3 scripts/build_claude_agents.py          # regenerate
-    python3 scripts/build_claude_agents.py --check  # exit 1 if out of date
+    python3 scripts/build_claude_plugin.py          # regenerate
+    python3 scripts/build_claude_plugin.py --check  # exit 1 if out of date
 """
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "agents"
-TARGET = ROOT / "claude" / "agents"
-SKILLS = ROOT / "claude" / "skills"
-MANIFEST = ROOT / ".claude-plugin" / "plugin.json"
+PLUGIN = ROOT / "claude"
+TARGET = PLUGIN / "agents"
+SKILLS = PLUGIN / "skills"
+MIRRORED = ("skills", "workflows")
+GENERATED = (TARGET, SKILLS, PLUGIN / "workflows")
 
 MODEL_LINE = re.compile(r"^model:\s*(\S+?)(?:\[effort=([\w-]+)\])?\s*$", re.M)
 READONLY_LINE = re.compile(r"^readonly:\s*true\s*$", re.M)
-HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_agents.py. Do not edit. -->\n"
+HEADER = "<!-- Generated from agents/{name} by scripts/build_claude_plugin.py. Do not edit. -->\n"
 SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", re.M)
 SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
 SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
@@ -80,8 +90,11 @@ def render(name: str, body: str, target: str) -> str:
     return out
 
 
-def expected() -> dict[Path, str]:
-    agents, skills = {}, {}
+def expected() -> dict[Path, tuple[bytes, bool]]:
+    """Every generated file, as (contents, executable)."""
+    files: dict[Path, tuple[bytes, bool]] = {}
+    for source in mirrored_sources():
+        files[PLUGIN / source.relative_to(ROOT)] = (source.read_bytes(), is_executable(source))
     for source in sorted(SOURCE.glob("*.md")):
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
@@ -91,46 +104,63 @@ def expected() -> dict[Path, str]:
         if opened != closed or opened != len(SUBAGENT_ONLY.findall(body)):
             sys.exit(f"agents/{source.name}: subagent-only markers do not pair up")
         if description := SKILL_DESCRIPTION.search(body):
-            skills[SKILLS / source.stem / "SKILL.md"] = (
-                f"---\nname: {source.stem}\ndescription: {json.dumps(description.group(1))}\n---\n"
-                + header
-                + render(source.name, body, "skill")
+            skill = SKILLS / source.stem / "SKILL.md"
+            if skill in files:
+                sys.exit(f"agents/{source.name}: skills/{source.stem} already exists")
+            files[skill] = (
+                (
+                    f"---\nname: {source.stem}\ndescription: {json.dumps(description.group(1))}\n---\n"
+                    + header
+                    + render(source.name, body, "skill")
+                ).encode(),
+                False,
             )
         elif ANY_MARKER.search(body):
             sys.exit(f"agents/{source.name}: has skill markers but no claude-skill-description line")
         if (claude_frontmatter := to_claude(source.name, frontmatter)) is not None:
-            agents[TARGET / source.name] = claude_frontmatter + header + render(source.name, body, "agent")
-    manifest = json.loads(MANIFEST.read_text())
-    manifest["agents"] = [f"./{path.relative_to(ROOT)}" for path in agents]
-    manifest.pop("skills", None)
-    if skills:
-        manifest["skills"] = [f"./{SKILLS.relative_to(ROOT)}/"]
-    files = agents | skills
-    files[MANIFEST] = json.dumps(manifest, indent=2) + "\n"
+            files[TARGET / source.name] = ((claude_frontmatter + header + render(source.name, body, "agent")).encode(), False)
     return files
+
+
+def mirrored_sources() -> list[Path]:
+    """Files under MIRRORED that git tracks or would track, so .DS_Store and caches stay out."""
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *MIRRORED],
+        cwd=ROOT, capture_output=True, check=True, text=True,
+    ).stdout
+    return sorted(path for name in listing.split("\0") if name and (path := ROOT / name).is_file())
+
+
+def is_executable(path: Path) -> bool:
+    return bool(path.stat().st_mode & 0o100)
 
 
 def main() -> int:
     files = expected()
+    existing = {path for directory in GENERATED for path in directory.rglob("*") if path.is_file()}
     stale = sorted(
-        {path for path, text in files.items() if not path.exists() or path.read_text() != text}
-        | {path for path in TARGET.glob("*.md") if path not in files}
-        | {path for path in SKILLS.glob("*/SKILL.md") if path not in files}
+        {path for path, (data, executable) in files.items()
+         if not path.exists() or path.read_bytes() != data or is_executable(path) != executable}
+        | (existing - files.keys())
     )
     if "--check" in sys.argv:
         for path in stale:
             print(f"out of date: {path.relative_to(ROOT)}")
         if stale:
-            print("run: python3 scripts/build_claude_agents.py")
+            print("run: python3 scripts/build_claude_plugin.py")
         return 1 if stale else 0
     for path in stale:
         if path in files:
+            data, executable = files[path]
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(files[path])
+            path.write_bytes(data)
+            path.chmod(0o755 if executable else 0o644)
         else:
             path.unlink()
-            if not any(path.parent.iterdir()):
-                path.parent.rmdir()
+            for parent in path.parents:
+                if parent == PLUGIN or any(parent.iterdir()):
+                    break
+                parent.rmdir()
     return 0
 
 

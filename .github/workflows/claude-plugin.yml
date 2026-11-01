@@ -5,17 +5,17 @@ on:
     branches: [main]
     paths: &paths
       - agents/**
-      - claude/agents/**
-      - claude/skills/**
-      - .claude-plugin/plugin.json
-      - scripts/build_claude_agents.py
+      - skills/**
+      - workflows/**
+      - claude/**
+      - scripts/build_claude_plugin.py
       - .github/workflows/claude-plugin.yml
   pull_request:
     paths: *paths
 
 jobs:
-  # PRs must ship regenerated copies. On main, where cursor-skills-sync pushes
-  # agents/ edits without running the script, regenerate and commit instead.
+  # PRs must ship a regenerated claude/. On main, where cursor-skills-sync pushes
+  # agents/ and skills/ edits without running the script, regenerate and commit instead.
   agents-in-sync:
     runs-on: ubuntu-latest
     permissions:
@@ -23,13 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - if: github.event_name == 'pull_request'
-        run: python3 scripts/build_claude_agents.py --check
+        run: python3 scripts/build_claude_plugin.py --check
       - if: github.event_name == 'push'
         run: |
-          python3 scripts/build_claude_agents.py
-          git add claude/agents claude/skills .claude-plugin/plugin.json
+          python3 scripts/build_claude_plugin.py
+          git add claude
           git diff --cached --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Regenerate Claude Code agents from agents/"
+          git commit -m "Regenerate the Claude Code plugin in claude/"
           git push
