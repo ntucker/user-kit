@@ -606,14 +606,17 @@ function runAction(
     case 'update': {
       assert(input.n !== undefined, 'update needs n');
       const found = queue.items.find(item => item.n === input.n);
-      // an archived item comes back to the queue; its newer copy there wins over the archive's
-      const restored = found ? undefined : archived.find(item => item.n === input.n);
-      assert(found ?? restored, `no item #${input.n}`);
-      const updated = patch((found ?? restored)!, input, today);
-      const next = {
-        ...queue,
-        items: found ? queue.items.map(item => (item === found ? updated : item)) : [...queue.items, updated],
-      };
+      const target = found ?? archived.find(item => item.n === input.n);
+      assert(target, `no item #${input.n}`);
+      // an archived item comes back to the queue only reopened: closed, the next write would archive it again
+      assert(
+        found || input.state === 'queued' || input.state === 'running',
+        `#${input.n} is archived; set state queued or running to bring it back`,
+      );
+      const updated = patch(target, input, today);
+      const items =
+        found ? queue.items.map(item => (item === found ? updated : item)) : [...queue.items, updated];
+      const next = { ...queue, items };
       const verb = found ? 'Updated' : 'Restored from the archive';
       return { text: `${verb}:\n${itemText(next, input.n, today)}`, queue: next, n: input.n };
     }
@@ -686,21 +689,25 @@ export function prune(queue: Queue, cutoff: string): { queue: Queue; archived: I
   };
 }
 
-/** The archive file: one item per line, appended as items leave the queue; a later line for the same number wins */
-export function parseArchive(text: string): Item[] {
+/**
+ * The archive file: one item per line, added as items leave the queue; a
+ * later line for the same number wins. Unreadable lines (one cut short by an
+ * interrupted write) are skipped and listed, so one bad line never hides the rest.
+ */
+export function parseArchive(text: string): { items: Item[]; skipped: number[] } {
   const byN = new Map<number, Item>();
+  const skipped: number[] = [];
   text.split('\n').forEach((line, i) => {
     if (!line.trim()) return;
-    let item: unknown;
     try {
-      item = JSON.parse(line);
-    } catch (error) {
-      throw new QueueError(`archive line ${i + 1} is not JSON: ${(error as Error).message}`);
+      const item: unknown = JSON.parse(line);
+      checkItem(item, `archive line ${i + 1}`);
+      byN.set(item.n, item);
+    } catch {
+      skipped.push(i + 1);
     }
-    checkItem(item, `archive line ${i + 1}`);
-    byN.set(item.n, item);
   });
-  return [...byN.values()];
+  return { items: [...byN.values()], skipped };
 }
 
 export const archiveLines = (items: readonly Item[]) =>

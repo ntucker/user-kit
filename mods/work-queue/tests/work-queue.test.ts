@@ -216,11 +216,11 @@ describe('archive', () => {
   });
 
   test('history finds archived items by words, newest first', async () => {
-    const archived = parseArchive(`${JSON.stringify(item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped the theme' }))}\n${JSON.stringify(item(2, { state: 'dropped', ended: '2026-10-05' }))}\n`);
+    const { items: archived } = parseArchive(`${JSON.stringify(item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped the theme' }))}\n${JSON.stringify(item(2, { state: 'dropped', ended: '2026-10-05' }))}\n`);
     expect(historyText(archived, '')).toBe('Archived (2)\n  #2 Item 2 [dropped 2026-10-05]\n  #1 Item 1 [done 2026-10-01: Shipped the theme]');
     expect(historyText(archived, 'THEME shipped')).toContain('#1 Item 1');
     expect(historyText(archived, 'nothing')).toBe('No archived item matches "nothing".');
-    expect(() => parseArchive('{nope')).toThrow('archive line 1 is not JSON');
+    expect(parseArchive(`{nope\n${JSON.stringify(item(3))}\n{"n":4}`)).toEqual({ items: [item(3)], skipped: [1, 3] });
   });
 });
 
@@ -395,13 +395,14 @@ describe('the plugin', () => {
     capture(on);
     await queueTool($, { action: 'update', n: 2, note: 'hi' });
     expect(ns(fs.read().items)).toEqual([2]);
-    expect(parseArchive(fs.files.get('work-queue.archive.jsonl')!)).toEqual([
+    expect(parseArchive(fs.files.get('work-queue.archive.jsonl')!).items).toEqual([
       item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped' }),
     ]);
     expect(await queueTool($, { action: 'get', n: 1 })).toContain('Ended: 2026-10-01: Shipped\n');
     expect((await run($, 'history ship')).text).toContain('#1 Item 1 [done 2026-10-01: Shipped]');
     expect((await queueTool($, { action: 'add', title: 'Next', brief: 'B' }))).toContain('#3 Next');
-    // updating an archived item brings it back
+    // an archived item comes back only reopened
+    expect(await queueTool($, { action: 'update', n: 1, note: 'x' })).toContain('set state queued or running');
     expect(await queueTool($, { action: 'update', n: 1, state: 'queued' })).toContain('Restored from the archive');
     expect(ns(fs.read().items)).toEqual([2, 3, 1]);
   });
@@ -409,9 +410,14 @@ describe('the plugin', () => {
   test('a new queue file numbers past the archive', async ($, on) => {
     const fs = await fakeFs(on);
     capture(on);
-    // its last line was cut short
-    fs.put('work-queue.archive.jsonl', JSON.stringify(item(7, { state: 'done' })));
+    // its last line was cut short: the next one still starts on a line of its own
+    fs.put('work-queue.archive.jsonl', `${JSON.stringify(item(6, { state: 'done' }))}\n${JSON.stringify(item(7, { state: 'done' }))}`);
     expect(await queueTool($, { action: 'add', title: 'Fresh', brief: 'B' })).toContain('#8 Fresh');
+    await queueTool($, { action: 'add', title: 'Old', brief: 'B' });
+    await queueTool($, { action: 'update', n: 9, state: 'dropped' });
+    fs.put(FILE, JSON.stringify({ ...fs.read(), items: fs.read().items.map(one => (one.n === 9 ? { ...one, ended: '2026-01-01' } : one)) }));
+    await queueTool($, { action: 'update', n: 8, note: 'prune' });
+    expect(ns(parseArchive(fs.files.get('work-queue.archive.jsonl')!).items)).toEqual([6, 7, 9]);
   });
 
   test('keeps finished items when archiving is off', { options: { archiveAfterDays: 0 } }, async ($, on) => {

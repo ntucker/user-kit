@@ -11,6 +11,7 @@ import {
   byNumber,
   daysBefore,
   groupItems,
+  highestN,
   needsArchive,
   parseArchive,
   prune,
@@ -50,6 +51,8 @@ const ARGS = '[all | <n> | start <n> | done <n> [outcome] | drop <n> [reason] | 
 const USAGE = `Usage: /queue ${ARGS}`;
 const FINISH = { done: 'done', drop: 'dropped' } as const;
 
+const DEFAULT_ARCHIVE_DAYS = 14;
+
 type Options = {
   file: string;
   markdown: string;
@@ -63,7 +66,7 @@ let options: Options = {
   markdown: '',
   checkPrs: true,
   archive: '',
-  archiveAfterDays: 14,
+  archiveAfterDays: DEFAULT_ARCHIVE_DAYS,
 };
 
 /** The archive file: the option, or the queue file's name with .archive.jsonl */
@@ -91,11 +94,17 @@ async function mtimeOf($: EngineInterface): Promise<number | undefined> {
   return (await $.fs.stat(options.file)).mtimeMs;
 }
 
-/** The file as a snapshot, with the text it was read from */
+/** The file as a snapshot, with the text it was read from; a failed read is an error snapshot */
 async function load($: EngineInterface): Promise<{ snapshot: QueueSnapshot; text?: string }> {
-  const mtimeMs = await mtimeOf($);
-  if (mtimeMs === undefined) return { snapshot: { kind: 'missing' } };
-  const text = await $.fs.read(options.file);
+  let mtimeMs: number | undefined;
+  let text: string;
+  try {
+    mtimeMs = await mtimeOf($);
+    if (mtimeMs === undefined) return { snapshot: { kind: 'missing' } };
+    text = await $.fs.read(options.file);
+  } catch (error) {
+    return { snapshot: { kind: 'error', message: `could not read it: ${(error as Error).message}` } };
+  }
   try {
     return { snapshot: { kind: 'ok', queue: parseQueue(text), mtimeMs }, text };
   } catch (error) {
@@ -111,8 +120,12 @@ async function readFile($: EngineInterface): Promise<QueueSnapshot> {
 const textNow = async ($: EngineInterface) =>
   (await $.fs.exists(options.file)) ? $.fs.read(options.file) : undefined;
 
-async function readArchive($: EngineInterface) {
-  return (await $.fs.exists(archivePath())) ? parseArchive(await $.fs.read(archivePath())) : [];
+type Archive = ReturnType<typeof parseArchive>;
+
+async function readArchive($: EngineInterface): Promise<Archive> {
+  return (await $.fs.exists(archivePath())) ?
+      parseArchive(await $.fs.read(archivePath()))
+    : { items: [], skipped: [] };
 }
 
 const sameSnapshot = (a: QueueSnapshot | null, b: QueueSnapshot) =>
@@ -181,12 +194,18 @@ function apply($: EngineInterface, input: ToolInput): Promise<string> {
       const { snapshot: onDisk, text } = await load($);
       if (onDisk.kind === 'error' || (onDisk.kind === 'missing' && isRead))
         throw new QueueError(describe(onDisk));
-      const queue: Queue =
-        onDisk.kind === 'ok' ? onDisk.queue
-          // a new file still numbers past the archive
-        : { version: 1, lastN: Math.max(0, ...(await readArchive($)).map(item => item.n)), items: [] };
-      const archived = needsArchive(queue, input) ? await readArchive($) : [];
-      const ran = runTool(queue, input, day, archived);
+      let archive: Archive = { items: [], skipped: [] };
+      let queue: Queue;
+      if (onDisk.kind === 'ok') queue = onDisk.queue;
+      else {
+        // a new file still numbers past the archive
+        archive = await readArchive($);
+        queue = { version: 1, lastN: highestN({ version: 1, items: archive.items }), items: [] };
+      }
+      if (onDisk.kind === 'ok' && needsArchive(queue, input)) archive = await readArchive($);
+      const ran = runTool(queue, input, day, archive.items);
+      if (archive.skipped.length)
+        ran.text += `\n(skipped unreadable archive lines: ${archive.skipped.join(', ')})`;
       if (!ran.queue) {
         if (!sameSnapshot(await read($, snapshotAtom), onDisk)) await show($, onDisk);
         return ran.text;
@@ -309,7 +328,7 @@ async function command($: EngineInterface, args: string): Promise<string> {
 export const register: Register = (on, rawOptions) => {
   const raw = rawOptions as unknown as Options;
   const days = Math.floor(Number(raw.archiveAfterDays));
-  options = { ...raw, archiveAfterDays: Number.isFinite(days) && days >= 0 ? days : 14 };
+  options = { ...raw, archiveAfterDays: Number.isFinite(days) && days >= 0 ? days : DEFAULT_ARCHIVE_DAYS };
 
   on('session.start', async ($, e, next) => {
     await Promise.all([
@@ -325,7 +344,7 @@ export const register: Register = (on, rawOptions) => {
         isDeferred: false,
       }),
     ]);
-    poll ??= $.clock.every(POLL_MS, () => void refresh($).catch(() => undefined));
+    poll ??= $.clock.every(POLL_MS, () => void refresh($));
     void refresh($, true);
     return next(e);
   });
