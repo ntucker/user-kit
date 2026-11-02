@@ -38,6 +38,12 @@ export const isoDay = (date: Date) =>
     .map(part => String(part).padStart(2, '0'))
     .join('-');
 
+/** The local day `days` before `day` (both YYYY-MM-DD) */
+export function daysBefore(day: string, days: number): string {
+  const [y = 0, m = 1, d = 1] = day.split('-').map(Number);
+  return isoDay(new Date(y, m - 1, d - days));
+}
+
 /** A wait's identity: its kind and what it names, so edits never go by position */
 const waitKey = (wait: Wait) => {
   switch (wait.kind) {
@@ -65,8 +71,11 @@ function openWaits(
     switch (wait.kind) {
       case 'pr':
         return !wait.isMerged;
-      case 'item':
-        return !isClosed(byN.get(wait.item));
+      case 'item': {
+        // an item no longer in the queue was archived, so it ended
+        const target = byN.get(wait.item);
+        return target !== undefined && !isClosed(target);
+      }
       case 'event':
         return wait.after === undefined || wait.after > today;
       case 'decision':
@@ -349,7 +358,11 @@ function checkItem(item: unknown, where: string): asserts item is Item {
   );
 }
 
-/** Checks the whole queue: each item, unique numbers, waits on items that exist */
+/** The highest item number ever used, archived items included */
+const lastN = (queue: Queue) =>
+  Math.max(queue.lastN ?? 0, ...queue.items.map(item => item.n));
+
+/** Checks the whole queue: each item, unique numbers, waits on numbers in use */
 function checkQueue(queue: Queue) {
   assert(queue && queue.version === 1, 'version must be 1');
   assert(Array.isArray(queue.items), 'items must be an array');
@@ -359,19 +372,41 @@ function checkQueue(queue: Queue) {
     'order must be a list of item numbers',
   );
   assert(queue.rules === undefined || typeof queue.rules === 'string', 'rules must be text');
+  assert(
+    queue.lastN === undefined || (Number.isInteger(queue.lastN) && queue.lastN >= 0),
+    'lastN must be a whole number',
+  );
   const seen = new Set<number>();
   queue.items.forEach((item, i) => {
     checkItem(item, `item ${i}`);
     assert(!seen.has(item.n), `item #${item.n} appears twice`);
     seen.add(item.n);
   });
+  const last = lastN(queue);
+  // a number in use but not in the file was archived (or removed by hand): that wait has cleared
   for (const item of queue.items)
     for (const wait of item.waits)
-      if (wait.kind === 'item')
-        assert(
-          wait.item !== item.n && seen.has(wait.item),
-          `item #${item.n} waits on #${wait.item}, which ${wait.item === item.n ? 'is itself' : 'does not exist'}`,
-        );
+      if (wait.kind === 'item') {
+        assert(wait.item !== item.n, `item #${item.n} waits on itself`);
+        assert(wait.item <= last, `item #${item.n} waits on #${wait.item}, which does not exist`);
+      }
+}
+
+/** Refuses waits that would leave `n` waiting on itself through other open items */
+function checkNoCycle(queue: Queue, n: number) {
+  const byN = byNumber(queue);
+  const seen = new Set<number>();
+  const visit = (at: number): void => {
+    const item = byN.get(at);
+    if (!item || isClosed(item) || seen.has(at)) return;
+    seen.add(at);
+    for (const wait of item.waits)
+      if (wait.kind === 'item') {
+        assert(wait.item !== n, `#${n} would wait on itself through #${at}`);
+        visit(wait.item);
+      }
+  };
+  for (const wait of byN.get(n)?.waits ?? []) if (wait.kind === 'item') visit(wait.item);
 }
 
 /** Parses and checks the queue file; throws QueueError saying what is wrong */
@@ -405,7 +440,7 @@ export function openPrs(queue: Queue): string[] {
 export function settlePrs(
   queue: Queue,
   merged: ReadonlySet<string>,
-  closed: ReadonlySet<string> = new Set(),
+  closed: ReadonlySet<string>,
 ): Queue {
   const settle = (w: Wait): Wait =>
     w.kind !== 'pr' || w.isMerged ? w
@@ -415,12 +450,12 @@ export function settlePrs(
     : w;
   let changed = false;
   const items = queue.items.map(item => {
-    if (!item.waits.some(w => settle(w) !== w)) return item;
+    // only queued items: an ended item keeps its waits as they were
+    if (item.state !== 'queued') return item;
+    const waits = item.waits.map(settle);
+    if (waits.every((w, i) => w === item.waits[i])) return item;
     changed = true;
-    return {
-      ...item,
-      waits: item.waits.map(settle),
-    };
+    return { ...item, waits };
   });
   return changed ? { ...queue, items } : queue;
 }
@@ -439,9 +474,13 @@ export const TOOL_SCHEMA = {
   required: ['action'],
   properties: {
     action: {
-      enum: ['list', 'get', 'add', 'update'],
+      enum: ['list', 'get', 'add', 'update', 'history'],
       description:
-        'list: open items by group. get: one item in full. add: a new item (title, brief, and waits if it cannot start yet). update: change item n.',
+        'list: open items by group. get: one item in full, archived ones too. add: a new item (title, brief, and waits if it cannot start yet). update: change item n. history: search archived items (ended long ago) by query.',
+    },
+    query: {
+      type: 'string',
+      description: 'history: words to find in the title, brief, outcome or notes; empty for the latest',
     },
     n: { type: 'integer', description: 'The item, for get and update' },
     withDone: { type: 'boolean', description: 'list: include done items' },
@@ -508,28 +547,43 @@ export function runTool(
   queue: Queue,
   input: ToolInput,
   today: string,
+  archived: readonly Item[] = [],
 ): { text: string; queue?: Queue } {
   const unknown = Object.keys(input).filter(key => !(key in TOOL_SCHEMA.properties));
   assert(unknown.length === 0, `unknown field ${unknown.join(', ')}; waits go in addWaits`);
-  const ran = runAction(queue, input, today);
-  if (ran.queue) checkQueue(ran.queue);
+  input.clearWaits?.forEach((wait, i) => checkWait(wait, `clearWaits ${i}`));
+  const ran = runAction(queue, input, today, archived);
+  if (ran.queue) {
+    checkQueue(ran.queue);
+    if (input.addWaits?.length) checkNoCycle(ran.queue, input.n ?? lastN(ran.queue));
+  }
   return ran;
 }
+
+/** Whether `input` reads the archive: a history search, or getting an item no longer in the queue */
+export const needsArchive = (queue: Queue, input: ToolInput) =>
+  input.action === 'history' ||
+  (input.action === 'get' && !queue.items.some(item => item.n === input.n));
 
 function runAction(
   queue: Queue,
   input: ToolInput,
   today: string,
+  archived: readonly Item[],
 ): { text: string; queue?: Queue } {
   switch (input.action) {
     case 'list':
       return { text: summaryText(queue, today, { withDone: input.withDone }) };
-    case 'get':
+    case 'get': {
       assert(input.n !== undefined, 'get needs n');
-      return { text: itemText(queue, input.n, today) };
+      const old = queue.items.some(item => item.n === input.n) ? undefined : archived.find(item => item.n === input.n);
+      return { text: old ? `${itemText({ version: 1, items: [old] }, old.n, today)}\n(archived)` : itemText(queue, input.n, today) };
+    }
+    case 'history':
+      return { text: historyText(archived, input.query ?? '') };
     case 'add': {
       assert(input.title && input.brief !== undefined, 'add needs title and brief');
-      const n = Math.max(0, ...queue.items.map(item => item.n)) + 1;
+      const n = lastN(queue) + 1;
       const item = patch(
         { n, title: input.title, brief: input.brief, state: 'queued', waits: [] },
         input,
@@ -550,7 +604,7 @@ function runAction(
       return { text: `Updated:\n${itemText(next, input.n, today)}`, queue: next };
     }
     default:
-      throw new QueueError('action must be list, get, add or update');
+      throw new QueueError('action must be list, get, add, update or history');
   }
 }
 
@@ -579,3 +633,61 @@ function patch(item: Item, input: ToolInput, today: string): Item {
   checkItem(next, `item #${next.n}`);
   return next;
 }
+
+
+/** How many archived items history lists */
+const HISTORY_LIMIT = 30;
+
+/** Archived items matching every word of `query`, newest end first */
+export function historyText(archived: readonly Item[], query: string): string {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = (item: Item) =>
+    [item.title, item.brief, item.outcome ?? '', ...(item.notes ?? []).map(note => note.text)]
+      .join('\n')
+      .toLowerCase();
+  const found = archived
+    .filter(item => words.every(word => haystack(item).includes(word)))
+    .sort((a, b) => (b.ended ?? '').localeCompare(a.ended ?? '') || b.n - a.n);
+  if (found.length === 0) return query ? `No archived item matches "${query}".` : 'The archive is empty.';
+  const lines = found
+    .slice(0, HISTORY_LIMIT)
+    .map(item => `  #${item.n} ${item.title} [${item.state} ${item.ended ?? ''}${item.outcome ? `: ${item.outcome}` : ''}]`);
+  const more = found.length - HISTORY_LIMIT;
+  return [`Archived (${found.length})`, ...lines, ...(more > 0 ? [`  …and ${more} more; narrow the query`] : [])].join('\n');
+}
+
+/**
+ * Moves done and dropped items that ended before `cutoff` (YYYY-MM-DD) out of
+ * the queue; ones with no end date count as old. Records the highest number
+ * so it is never reused.
+ */
+export function prune(queue: Queue, cutoff: string): { queue: Queue; archived: Item[] } {
+  const archived = queue.items.filter(item => isClosed(item) && (item.ended ?? '') < cutoff);
+  if (archived.length === 0) return { queue, archived };
+  const keep = queue.items.filter(item => !archived.includes(item));
+  const order = queue.order?.filter(n => keep.some(item => item.n === n));
+  return {
+    queue: { ...queue, lastN: lastN(queue), ...(order && { order }), items: keep },
+    archived,
+  };
+}
+
+/** The archive file: one item per line, appended as items leave the queue; a later line for the same number wins */
+export function parseArchive(text: string): Item[] {
+  const byN = new Map<number, Item>();
+  text.split('\n').forEach((line, i) => {
+    if (!line.trim()) return;
+    let item: unknown;
+    try {
+      item = JSON.parse(line);
+    } catch (error) {
+      throw new QueueError(`archive line ${i + 1} is not JSON: ${(error as Error).message}`);
+    }
+    checkItem(item, `archive line ${i + 1}`);
+    byN.set(item.n, item);
+  });
+  return [...byN.values()];
+}
+
+export const archiveLines = (items: readonly Item[]) =>
+  items.map(item => `${JSON.stringify(item)}\n`).join('');

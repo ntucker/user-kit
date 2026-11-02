@@ -4,9 +4,14 @@ import { describe, expect, mock, test } from 'claude-code/testing';
 import type { Item, Queue } from '../types';
 import {
   QueueError,
+  daysBefore,
   groupItems,
+  historyText,
+  parseArchive,
   parseQueue,
+  prune,
   runTool,
+  settlePrs,
   statusText,
   summaryText,
   toMarkdown,
@@ -135,6 +140,77 @@ describe('queue tool logic', () => {
       'state must be',
     );
     expect(() => parseQueue(JSON.stringify({ version: 1, items: [item(1), item(1)] }))).toThrow('appears twice');
+    expect(() => runTool(QUEUE, { action: 'add', title: 't', brief: 'b', waits: [] } as never, TODAY)).toThrow(
+      'waits go in addWaits',
+    );
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, clearWaits: [null as never] }, TODAY)).toThrow(QueueError);
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 1 }] }, TODAY)).toThrow(
+      'waits on itself',
+    );
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 40 }] }, TODAY)).toThrow(
+      'does not exist',
+    );
+    // 5 waits on 6, so 6 waiting on 5 would never clear
+    expect(() => runTool(QUEUE, { action: 'update', n: 6, addWaits: [{ kind: 'item', item: 5 }] }, TODAY)).toThrow(
+      '#6 would wait on itself through #5',
+    );
+  });
+
+  test('reopening an item clears its end', async () => {
+    const reopened = runTool(QUEUE, { action: 'update', n: 9, state: 'queued' }, TODAY);
+    const nine = reopened.queue?.items.find(one => one.n === 9);
+    expect(nine?.ended).toBeUndefined();
+    expect(nine?.outcome).toBeUndefined();
+  });
+
+  test('a PR closed without merging becomes a question, on queued items only', async () => {
+    const pr = 'reactive/data-client#4359';
+    const withDone = { ...QUEUE, items: [...QUEUE.items, item(12, { state: 'done', waits: [{ kind: 'pr', pr }] })] };
+    const settled = settlePrs(withDone, new Set(), new Set([pr]));
+    expect(settled.items.find(one => one.n === 11)?.waits[0]).toEqual({
+      kind: 'decision',
+      ask: `${pr} closed without merging: drop this item, or wait on another PR?`,
+    });
+    expect(settled.items.find(one => one.n === 12)?.waits).toEqual([{ kind: 'pr', pr }]);
+    expect(settlePrs(QUEUE, new Set(), new Set())).toBe(QUEUE);
+  });
+});
+
+describe('archive', () => {
+  const OLD: Queue = {
+    version: 1,
+    order: [2, 3],
+    items: [
+      item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped the theme' }),
+      item(2, { state: 'dropped' }),
+      item(3, { state: 'done', ended: '2026-11-01' }),
+      item(4, { waits: [{ kind: 'item', item: 2 }] }),
+    ],
+  };
+
+  test('moves items that ended before the cutoff, keeping their numbers used', async () => {
+    expect(daysBefore('2026-11-02', 14)).toBe('2026-10-19');
+    const { queue, archived } = prune(OLD, daysBefore(TODAY, 14));
+    // no end date counts as old
+    expect(ns(archived)).toEqual([1, 2]);
+    expect(ns(queue.items)).toEqual([3, 4]);
+    expect(queue.order).toEqual([3]);
+    expect(queue.lastN).toBe(4);
+    // a wait on an archived item has cleared
+    expect(ns(groupItems(queue, TODAY).ready)).toEqual([4]);
+    expect(parseQueue(JSON.stringify(queue))).toEqual(queue);
+    // the next number skips archived ones
+    const top = prune({ ...OLD, items: OLD.items.filter(one => one.n !== 4) }, TODAY).queue;
+    expect(runTool(top, { action: 'add', title: 'New', brief: 'B' }, TODAY).queue?.items.at(-1)?.n).toBe(4);
+    expect(prune(queue, '2026-01-01').queue).toBe(queue);
+  });
+
+  test('history finds archived items by words, newest first', async () => {
+    const archived = parseArchive(`${JSON.stringify(item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped the theme' }))}\n${JSON.stringify(item(2, { state: 'dropped', ended: '2026-10-05' }))}\n`);
+    expect(historyText(archived, '')).toBe('Archived (2)\n  #2 Item 2 [dropped 2026-10-05]\n  #1 Item 1 [done 2026-10-01: Shipped the theme]');
+    expect(historyText(archived, 'THEME shipped')).toContain('#1 Item 1');
+    expect(historyText(archived, 'nothing')).toBe('No archived item matches "nothing".');
+    expect(() => parseArchive('{nope')).toThrow('archive line 1 is not JSON');
   });
 });
 
@@ -299,6 +375,49 @@ describe('the plugin', () => {
     const before = fs.files.get(FILE);
     expect(await queueTool($, { action: 'update', n: 99 })).toBe('Error: no item #99');
     expect(fs.files.get(FILE)).toBe(before);
+  });
+
+  test('archives items that ended long ago and still finds them', async ($, on) => {
+    const fs = await fakeFs(on, {
+      version: 1,
+      items: [item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped' }), item(2)],
+    });
+    capture(on);
+    await queueTool($, { action: 'update', n: 2, note: 'hi' });
+    expect(ns(fs.read().items)).toEqual([2]);
+    expect(parseArchive(fs.files.get('work-queue.archive.jsonl')!)).toEqual([
+      item(1, { state: 'done', ended: '2026-10-01', outcome: 'Shipped' }),
+    ]);
+    expect(await queueTool($, { action: 'get', n: 1 })).toContain('Ended: 2026-10-01: Shipped\n');
+    expect((await run($, 'history ship')).text).toContain('#1 Item 1 [done 2026-10-01: Shipped]');
+    expect((await queueTool($, { action: 'add', title: 'Next', brief: 'B' }))).toContain('#3 Next');
+  });
+
+  test('keeps finished items when archiving is off', { options: { archiveAfterDays: 0 } }, async ($, on) => {
+    const fs = await fakeFs(on, { version: 1, items: [item(1, { state: 'done' }), item(2)] });
+    capture(on);
+    await queueTool($, { action: 'update', n: 2, note: 'hi' });
+    expect(ns(fs.read().items)).toEqual([1, 2]);
+    expect(fs.files.has('work-queue.archive.jsonl')).toBe(false);
+  });
+
+  test('a read of a missing file says there is none', async ($, on) => {
+    await fakeFs(on);
+    capture(on);
+    expect(await queueTool($, { action: 'list' })).toContain('No queue file yet');
+  });
+
+  test('gives up, without writing, when the file keeps changing', async ($, on) => {
+    const fs = await fakeFs(on, QUEUE);
+    capture(on);
+    let n = 20;
+    const churn = () => {
+      fs.put(FILE, JSON.stringify({ ...QUEUE, items: [...QUEUE.items, item(n++)] }));
+      fs.onNextRead(churn);
+    };
+    fs.onNextRead(churn);
+    expect(await queueTool($, { action: 'update', n: 1, note: 'mine' })).toContain('kept changing');
+    expect(fs.read().items.find(one => one.n === 1)?.notes).toBeUndefined();
   });
 
   test('says when the file is invalid', async ($, on) => {

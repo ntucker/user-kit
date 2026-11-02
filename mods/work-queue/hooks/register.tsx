@@ -7,8 +7,13 @@ import {
   GROUP_TITLE,
   OPEN_GROUPS,
   QueueError,
+  archiveLines,
   byNumber,
+  daysBefore,
   groupItems,
+  needsArchive,
+  parseArchive,
+  prune,
   isoDay,
   itemText,
   settlePrs,
@@ -41,13 +46,28 @@ const GROUP_COLOR: Partial<Record<Group, string>> = {
   running: 'claude',
 };
 
-const USAGE =
-  'Usage: /queue [all | <n> | start <n> | done <n> [outcome] | drop <n> [reason]]';
+const ARGS = '[all | <n> | start <n> | done <n> [outcome] | drop <n> [reason] | history [words]]';
+const USAGE = `Usage: /queue ${ARGS}`;
 const FINISH = { done: 'done', drop: 'dropped' } as const;
 
-type Options = { file: string; markdown: string; checkPrs: boolean };
+type Options = {
+  file: string;
+  markdown: string;
+  checkPrs: boolean;
+  archive: string;
+  archiveAfterDays: number;
+};
 
-let options: Options = { file: 'work-queue.json', markdown: '', checkPrs: true };
+let options: Options = {
+  file: 'work-queue.json',
+  markdown: '',
+  checkPrs: true,
+  archive: '',
+  archiveAfterDays: 14,
+};
+
+/** The archive file: the option, or the queue file's name with .archive.jsonl */
+const archivePath = () => options.archive || options.file.replace(/(\.json)?$/, '.archive.jsonl');
 let poll: Timer | undefined;
 /** The day the status line was last worked out for: event waits clear by date */
 let shownDay: string | undefined;
@@ -70,15 +90,36 @@ async function mtimeOf($: EngineInterface): Promise<number | undefined> {
   return stat?.mtimeMs;
 }
 
-async function readFile($: EngineInterface): Promise<QueueSnapshot> {
+/** The file as a snapshot, with the text it was read from */
+async function load($: EngineInterface): Promise<{ snapshot: QueueSnapshot; text?: string }> {
   const mtimeMs = await mtimeOf($);
-  if (mtimeMs === undefined) return { kind: 'missing' };
+  if (mtimeMs === undefined) return { snapshot: { kind: 'missing' } };
+  const text = await $.fs.read(options.file);
   try {
-    return { kind: 'ok', queue: parseQueue(await $.fs.read(options.file)), mtimeMs };
+    return { snapshot: { kind: 'ok', queue: parseQueue(text), mtimeMs }, text };
   } catch (error) {
-    return { kind: 'error', message: (error as Error).message };
+    return { snapshot: { kind: 'error', message: (error as Error).message }, text };
   }
 }
+
+async function readFile($: EngineInterface): Promise<QueueSnapshot> {
+  return (await load($)).snapshot;
+}
+
+/** The text on disk now, or undefined while there is no file */
+const textNow = ($: EngineInterface) =>
+  $.fs.read(options.file).catch(async error => {
+    if ((await mtimeOf($)) === undefined) return undefined;
+    throw error;
+  });
+
+async function readArchive($: EngineInterface) {
+  const exists = await $.fs.stat(archivePath()).then(() => true, () => false);
+  return exists ? parseArchive(await $.fs.read(archivePath())) : [];
+}
+
+const sameSnapshot = (a: QueueSnapshot | null, b: QueueSnapshot) =>
+  a?.kind === b.kind && (a.kind !== 'ok' || (b.kind === 'ok' && a.mtimeMs === b.mtimeMs));
 
 /** Shows a new snapshot: state, status line, toasts for newly ready items */
 async function show($: EngineInterface, next: QueueSnapshot) {
@@ -124,36 +165,51 @@ async function currentQueue($: EngineInterface): Promise<Queue> {
 const WRITE_TRIES = 3;
 
 /**
- * Runs a tool input against the file as it is now, so others' edits survive,
- * and writes it back when it changed; if another session wrote in between,
- * runs it again on theirs. Throws QueueError for a bad input.
+ * Runs a tool input against the file as it is now, so others' edits survive.
+ * A read answers from it (redrawing the pane if it was behind); a change is
+ * written back unless another session wrote in between, in which case it runs
+ * again on theirs. Throws QueueError for a bad input, or when the file keeps
+ * changing.
  */
 function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
     const day = await today($);
-    for (let tries = 1; ; tries++) {
-      const onDisk = await readFile($);
-      if (onDisk.kind === 'error') throw new QueueError(describe(onDisk));
+    for (let tries = 1; tries <= WRITE_TRIES; tries++) {
+      const { snapshot: onDisk, text } = await load($);
+      const isRead = input.action !== 'add' && input.action !== 'update';
+      if (onDisk.kind === 'error' || (onDisk.kind === 'missing' && isRead))
+        throw new QueueError(describe(onDisk));
       const queue: Queue = onDisk.kind === 'ok' ? onDisk.queue : { version: 1, items: [] };
-      const ran = runTool(queue, input, day);
+      const archived = needsArchive(queue, input) ? await readArchive($) : [];
+      const ran = runTool(queue, input, day, archived);
       if (!ran.queue) {
-        // a read: keep the pane and status line on what it read
-        const shown = await read($, snapshotAtom);
-        if (shown?.kind !== onDisk.kind || (shown.kind === 'ok' && onDisk.kind === 'ok' && shown.mtimeMs !== onDisk.mtimeMs))
-          await show($, onDisk);
+        if (!sameSnapshot(await read($, snapshotAtom), onDisk)) await show($, onDisk);
         return ran.text;
       }
-      const isUnchanged =
-        (await mtimeOf($)) === (onDisk.kind === 'ok' ? onDisk.mtimeMs : undefined);
-      if (isUnchanged || tries === WRITE_TRIES) {
+      // by content: a synced folder's mtimes can be coarse or carried over
+      if ((await textNow($)) === text) {
         await write($, ran.queue, day);
         return ran.text;
       }
     }
+    throw new QueueError('the queue file kept changing while this ran; try again');
   });
 }
 
-async function write($: EngineInterface, queue: Queue, day: string) {
+/**
+ * Writes the queue, first moving items that ended over archiveAfterDays ago
+ * to the archive; an item in both (a write cut short) is shown from the queue
+ */
+async function write($: EngineInterface, full: Queue, day: string) {
+  const { queue, archived } =
+    options.archiveAfterDays > 0 ?
+      prune(full, daysBefore(day, options.archiveAfterDays))
+    : { queue: full, archived: [] };
+  if (archived.length) {
+    const exists = await $.fs.stat(archivePath()).then(() => true, () => false);
+    const before = exists ? await $.fs.read(archivePath()) : '';
+    await $.fs.write(archivePath(), before + archiveLines(archived));
+  }
   await $.fs.write(options.file, serialize(queue));
   if (options.markdown) await $.fs.write(options.markdown, toMarkdown(queue, day));
   await show($, { kind: 'ok', queue, mtimeMs: (await mtimeOf($)) ?? 0 });
@@ -220,7 +276,8 @@ async function command($: EngineInterface, args: string): Promise<string> {
     const queue = await currentQueue($);
     return summaryText(queue, await today($), { withDone: verb === 'all' });
   }
-  if (/^\d+$/.test(verb)) return itemText(await currentQueue($), Number(verb), await today($));
+  if (/^\d+$/.test(verb)) return apply($, { action: 'get', n: Number(verb) });
+  if (verb === 'history') return apply($, { action: 'history', query: [arg, ...rest].join(' ') });
   if (!/^\d+$/.test(arg)) return USAGE;
   const n = Number(arg);
   if (verb === 'start') return startItem($, n);
@@ -239,11 +296,11 @@ export const register: Register = (on, rawOptions) => {
       $.command.register({
         name: 'queue',
         description: 'Show the work queue, or start, finish or drop an item',
-        argumentHint: '[all | <n> | start <n> | done <n> [outcome] | drop <n> [reason]]',
+        argumentHint: ARGS,
       }),
       $.tool.register({
         name: 'queue',
-        description: `The shared work queue (${options.file}): numbered items with a self-contained brief, a state (queued, running, done, dropped) and what each waits on (a PR, the person's decision, another item, an event). list shows open items grouped by what they wait on; get shows one; add and update change the file. Use it instead of editing the queue file by hand. Mark an item running when work on it starts and done (with an outcome) when it ends; record new follow-ups with add.`,
+        description: `The shared work queue (${options.file}): numbered items with a self-contained brief, a state (queued, running, done, dropped) and what each waits on (a PR, the person's decision, another item, an event). list shows open items grouped by what they wait on; get shows one; add and update change the file; history searches items archived after they ended. Use it instead of editing the queue file by hand. Mark an item running when work on it starts and done (with an outcome) when it ends; record new follow-ups with add.`,
         inputSchema: TOOL_SCHEMA as unknown as Record<string, unknown>,
         isDeferred: false,
       }),

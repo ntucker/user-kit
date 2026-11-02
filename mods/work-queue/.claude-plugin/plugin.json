@@ -27,6 +27,18 @@
       "title": "Check PRs with gh",
       "description": "Clear a 'waits on PR' once gh reports the PR merged",
       "default": true
+    },
+    "archive": {
+      "type": "string",
+      "title": "Archive file",
+      "description": "Where items go once they have ended a while ago: one JSON item per line. Empty for the queue file's name with .archive.jsonl",
+      "default": ""
+    },
+    "archiveAfterDays": {
+      "type": "number",
+      "title": "Archive after days",
+      "description": "Move done and dropped items to the archive this many days after they end; 0 keeps them in the queue",
+      "default": 14
     }
   }
 }

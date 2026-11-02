@@ -4,7 +4,7 @@ export type Wait =
   | { kind: 'pr'; pr: string; isMerged?: boolean }
   /** A question only the person can answer */
   | { kind: 'decision'; ask: string }
-  /** Another queue item; cleared once that item is done or dropped */
+  /** Another queue item; cleared once that item is done or dropped, or archived */
   | { kind: 'item'; item: number }
   /** Anything else; with `after` (YYYY-MM-DD) it clears on that day */
   | { kind: 'event'; what: string; after?: string };
@@ -44,6 +44,8 @@ export type Queue = {
   rules?: string;
   /** Item numbers to start first, in order; the rest follow by priority */
   order?: number[];
+  /** The highest item number ever used, set once items are archived, so their numbers are not reused */
+  lastN?: number;
   items: Item[];
 };
 
@@ -67,8 +69,10 @@ export type QueueSnapshot =
 
 /** What the `queue` tool takes */
 export type ToolInput = {
-  action: 'list' | 'get' | 'add' | 'update';
+  action: 'list' | 'get' | 'add' | 'update' | 'history';
   n?: number;
+  /** history: words to find */
+  query?: string;
   withDone?: boolean;
   title?: string;
   brief?: string;

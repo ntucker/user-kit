@@ -5,8 +5,9 @@ A work queue shared by every session that can reach one JSON file: what is waiti
 - **Pane** (`/queue`): open items grouped by what holds them back (Needs your call, Ready, Waiting on PRs, Waiting on other items, Waiting on events), plus Running and Done tabs. Press an item for its brief, waits and notes, and **Start** to hand it to Claude.
 - **Status line**: `queue 3 ready · 6 need you · 4 wait on PRs · 5 running`.
 - **Toasts** when an item becomes ready, for example when the PR it waited on merges.
-- **`/queue`** commands: `/queue` (summary and pane), `/queue all`, `/queue <n>`, `/queue start <n>`, `/queue done <n> [outcome]`, `/queue drop <n> [reason]`.
+- **`/queue`** commands: `/queue` (summary and pane), `/queue all`, `/queue <n>`, `/queue start <n>`, `/queue done <n> [outcome]`, `/queue drop <n> [reason]`, `/queue history [words]`.
 - **`queue` tool**: Claude lists, reads, adds and updates items instead of editing the file by hand, so every change is checked and lands on the file as it is now.
+- **Archive**: items that ended two weeks ago move to a separate file, so the queue stays small; `get` and `history` still find them.
 
 ## The file
 
@@ -44,7 +45,7 @@ A work queue shared by every session that can reach one JSON file: what is waiti
 | --- | --- |
 | `{ "kind": "decision", "ask": "…" }` | removed |
 | `{ "kind": "pr", "pr": "owner/repo#123" }` | `gh` reports the PR merged (checked every 5 minutes); a PR closed without merging becomes a decision |
-| `{ "kind": "item", "item": 9 }` | item 9 is done or dropped (it must exist) |
+| `{ "kind": "item", "item": 9 }` | item 9 is done, dropped or archived |
 | `{ "kind": "event", "what": "…", "after": "2026-11-08" }` | that date, or removed when it has none |
 
 Items also carry `repo`, `source`, `thread` (`{ title, url }`), `prs`, dated `notes`, `started`, `ended` and `outcome`. `order` lists items to start first; the rest follow by priority, then number.
@@ -58,8 +59,16 @@ Set in `/config` or settings.json `pluginConfigs["work-queue"].options`:
 | `file` | `work-queue.json` | The queue file, absolute or relative to the working directory |
 | `markdown` | none | Also write a readable Markdown copy here after each change, for readers without the plugin |
 | `checkPrs` | `true` | Clear PR waits once `gh` reports them merged |
+| `archiveAfterDays` | `14` | Move done and dropped items to the archive this many days after they end (items with no end date count as old); `0` keeps them |
+| `archive` | next to the queue | The archive file; by default the queue file's name with `.archive.jsonl` |
 
-The file is re-read when its modification time changes (checked every 20 seconds). Each change re-reads it first, and runs again on the newer file if another session wrote in between, so sessions sharing the file through a synced or network folder keep each other's edits; waits are removed by what they name, never by position. Two writes in the same instant can still race, and the last one wins. Dates (`started`, `ended`, notes, an event's `after`) are the local calendar day.
+## The archive
+
+Each change to the queue first moves items that ended more than `archiveAfterDays` ago into the archive: one item per line, as JSON, added to the end. The queue keeps `lastN`, the highest number used, so new items never take an archived number, and a wait on an archived item counts as cleared. The archive is read only to show an item no longer in the queue (`get`, `/queue <n>`) or to search it (`history`, `/queue history [words]`). If a write is cut short between the two files, an item can be in both; the queue's copy is the one shown.
+
+## Sharing the file
+
+The file is re-read when its modification time changes (checked every 20 seconds). Each change re-reads it first, and runs again on the newer file if its content changed while the change ran, so sessions sharing the file through a synced or network folder keep each other's edits; after three tries the change fails with an error rather than overwrite. Waits are removed by what they name, never by position. Two writes in the same instant can still race, and the last one wins. Dates (`started`, `ended`, notes, an event's `after`) are the local calendar day.
 
 ### Why not Claude Code's task list
 
