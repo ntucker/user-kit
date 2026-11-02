@@ -174,6 +174,8 @@ describe('queue tool logic', () => {
   });
 
   test('moving between done and dropped keeps the day it ended', async () => {
+    const undated = runTool({ version: 1, items: [item(1, { state: 'done' })] }, { action: 'update', n: 1, state: 'dropped' }, TODAY, []);
+    expect(undated.queue?.items[0]?.ended).toBeUndefined();
     const dropped = runTool(QUEUE, { action: 'update', n: 9, state: 'dropped' }, TODAY, []);
     expect(dropped.queue?.items.find(one => one.n === 9)?.ended).toBe('2026-11-01');
   });

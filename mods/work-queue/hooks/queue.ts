@@ -589,8 +589,8 @@ function runAction(
     case 'get': {
       assert(input.n !== undefined, 'get needs n');
       const old = queue.items.some(item => item.n === input.n) ? undefined : archived.find(item => item.n === input.n);
-      // the items an archived item names may be archived too, so it is shown without looking them up (item waits read as cleared)
-      return { text: old ? [...itemLines(old, new Map(), today), '(archived)'].join('\n') : itemText(queue, input.n, today) };
+      // its item waits are looked up in the queue: one on an item no longer there reads as cleared
+      return { text: old ? [...itemLines(old, byNumber(queue), today), '(archived)'].join('\n') : itemText(queue, input.n, today) };
     }
     case 'history':
       return { text: historyText(archived, input.query ?? '') };
@@ -633,7 +633,7 @@ function patch(item: Item, input: ToolInput, today: string): Item {
   if (input.state !== undefined && input.state !== item.state) {
     next.state = input.state;
     if (input.state === 'running') next.started ??= today;
-    // from one ended state to the other, it keeps the day it ended
+    // from one ended state to the other, it keeps the day it ended, or none (which the archive reads as old)
     if (isClosed(next)) {
       if (!isClosed(item)) next.ended = today;
     } else {
