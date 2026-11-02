@@ -14,24 +14,24 @@ A work queue shared by every session that can reach one JSON file: what is waiti
 {
   "version": 1,
   "rules": "Start the next item only when 5 or fewer sessions are working.",
-  "order": [56],
+  "order": [12],
   "items": [
     {
-      "n": 56,
-      "title": "Review regenerate-check failures",
+      "n": 12,
+      "title": "Write the release notes",
       "brief": "Enough for someone with no context to start the work.",
       "state": "queued",
       "priority": "low",
       "waits": []
     },
     {
-      "n": 79,
-      "title": "Pause control for looping diagrams",
+      "n": 14,
+      "title": "Add a dark theme",
       "brief": "…",
       "state": "queued",
       "waits": [
-        { "kind": "pr", "pr": "reactive/data-client#4349" },
-        { "kind": "decision", "ask": "Pause per diagram or site-wide?" }
+        { "kind": "pr", "pr": "acme/web#101" },
+        { "kind": "decision", "ask": "Follow the OS setting, or a toggle?" }
       ]
     }
   ]
@@ -43,8 +43,8 @@ A work queue shared by every session that can reach one JSON file: what is waiti
 | Wait | Open until |
 | --- | --- |
 | `{ "kind": "decision", "ask": "…" }` | removed |
-| `{ "kind": "pr", "pr": "owner/repo#123" }` | `gh` reports the PR merged (checked every 5 minutes) |
-| `{ "kind": "item", "item": 90 }` | item 90 is done or dropped |
+| `{ "kind": "pr", "pr": "owner/repo#123" }` | `gh` reports the PR merged (checked every 5 minutes); a PR closed without merging becomes a decision |
+| `{ "kind": "item", "item": 9 }` | item 9 is done or dropped (it must exist) |
 | `{ "kind": "event", "what": "…", "after": "2026-11-08" }` | that date, or removed when it has none |
 
 Items also carry `repo`, `source`, `thread` (`{ title, url }`), `prs`, dated `notes`, `started`, `ended` and `outcome`. `order` lists items to start first; the rest follow by priority, then number.

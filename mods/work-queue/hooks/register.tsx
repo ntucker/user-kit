@@ -11,7 +11,7 @@ import {
   groupItems,
   isoDay,
   itemText,
-  markMerged,
+  settlePrs,
   newlyReady,
   openPrs,
   parseQueue,
@@ -49,6 +49,8 @@ type Options = { file: string; markdown: string; checkPrs: boolean };
 
 let options: Options = { file: 'work-queue.json', markdown: '', checkPrs: true };
 let poll: Timer | undefined;
+/** The day the status line was last worked out for: event waits clear by date */
+let shownDay: string | undefined;
 let prPoll: Timer | undefined;
 /** Reads and writes of the file run one after another */
 let chain: Promise<unknown> = Promise.resolve();
@@ -88,6 +90,7 @@ async function show($: EngineInterface, next: QueueSnapshot) {
     return;
   }
   const day = await today($);
+  shownDay = day;
   const grouped = groupItems(next.queue, day);
   $.ui.status(statusText(grouped));
   if (previous?.kind === 'ok')
@@ -96,12 +99,14 @@ async function show($: EngineInterface, next: QueueSnapshot) {
   syncPrPoll($, next);
 }
 
-/** Re-reads the file when it changed since the last read */
+/** Re-reads the file when it changed since the last read, and redraws on a new day */
 function refresh($: EngineInterface, force = false): Promise<QueueSnapshot> {
   return serial(async () => {
     const current = await read($, snapshotAtom);
-    if (!force && current?.kind === 'ok' && (await mtimeOf($)) === current.mtimeMs)
+    if (!force && current?.kind === 'ok' && (await mtimeOf($)) === current.mtimeMs) {
+      if ((await today($)) !== shownDay) await show($, current);
       return current;
+    }
     const next = await readFile($);
     await show($, next);
     return next;
@@ -127,12 +132,19 @@ function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
     const day = await today($);
     for (let tries = 1; ; tries++) {
-      const read = await readFile($);
-      if (read.kind === 'error') throw new QueueError(describe(read));
-      const queue: Queue = read.kind === 'ok' ? read.queue : { version: 1, items: [] };
+      const onDisk = await readFile($);
+      if (onDisk.kind === 'error') throw new QueueError(describe(onDisk));
+      const queue: Queue = onDisk.kind === 'ok' ? onDisk.queue : { version: 1, items: [] };
       const ran = runTool(queue, input, day);
-      if (!ran.queue) return ran.text;
-      const isUnchanged = (await mtimeOf($)) === (read.kind === 'ok' ? read.mtimeMs : undefined);
+      if (!ran.queue) {
+        // a read: keep the pane and status line on what it read
+        const shown = await read($, snapshotAtom);
+        if (shown?.kind !== onDisk.kind || (shown.kind === 'ok' && onDisk.kind === 'ok' && shown.mtimeMs !== onDisk.mtimeMs))
+          await show($, onDisk);
+        return ran.text;
+      }
+      const isUnchanged =
+        (await mtimeOf($)) === (onDisk.kind === 'ok' ? onDisk.mtimeMs : undefined);
       if (isUnchanged || tries === WRITE_TRIES) {
         await write($, ran.queue, day);
         return ran.text;
@@ -147,7 +159,7 @@ async function write($: EngineInterface, queue: Queue, day: string) {
   await show($, { kind: 'ok', queue, mtimeMs: (await mtimeOf($)) ?? 0 });
 }
 
-/** Clears waits on PRs gh reports merged */
+/** Settles waits on PRs gh reports merged, or closed without merging */
 async function checkPrs($: EngineInterface) {
   const snapshot = await read($, snapshotAtom);
   if (snapshot?.kind !== 'ok') return;
@@ -157,16 +169,19 @@ async function checkPrs($: EngineInterface) {
       const ran = await $.process.run([
         'gh', 'pr', 'view', number, '-R', repo, '--json', 'state', '-q', '.state',
       ]);
-      return ran.exitCode === 0 && ran.stdout.trim() === 'MERGED' ? pr : undefined;
+      return [pr, ran.exitCode === 0 ? ran.stdout.trim() : ''] as const;
     }),
   );
-  const merged = new Set(states.filter(pr => pr !== undefined));
-  if (merged.size === 0) return;
+  const withState = (state: string) =>
+    new Set(states.filter(([, s]) => s === state).map(([pr]) => pr));
+  const merged = withState('MERGED');
+  const closed = withState('CLOSED');
+  if (merged.size + closed.size === 0) return;
   await serial(async () => {
-    const read = await readFile($);
-    if (read.kind !== 'ok') return;
-    const next = markMerged(read.queue, merged);
-    if (next !== read.queue) await write($, next, await today($));
+    const onDisk = await readFile($);
+    if (onDisk.kind !== 'ok') return;
+    const next = settlePrs(onDisk.queue, merged, closed);
+    if (next !== onDisk.queue) await write($, next, await today($));
   });
 }
 
@@ -182,8 +197,11 @@ function syncPrPoll($: EngineInterface, snapshot: QueueSnapshot) {
 
 /** Asks Claude to start item n */
 async function startItem($: EngineInterface, n: number): Promise<string> {
-  const text = itemText(await currentQueue($), n, await today($));
-  if (text.startsWith('No item')) return text;
+  const queue = await currentQueue($);
+  const item = byNumber(queue).get(n);
+  if (!item) return `No item #${n}.`;
+  if (item.state !== 'queued') return `#${n} is ${item.state}; only a queued item can start.`;
+  const text = itemText(queue, n, await today($));
   // /queue's command.run hook holds the turn a submit would wait on, so submit after it
   $.clock.after(0, () =>
     void $.prompt
@@ -246,10 +264,7 @@ export const register: Register = (on, rawOptions) => {
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const { tool: _tool, tool_use_id: _id, ...input } = e;
     try {
-      const isRead = input.action === 'list' || input.action === 'get';
-      const text =
-        isRead ? runTool(await currentQueue($), input, await today($)).text : await apply($, input);
-      return { result: text };
+      return { result: await apply($, input) };
     } catch (error) {
       if (error instanceof QueueError) return { result: `Error: ${error.message}` };
       throw error;

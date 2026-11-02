@@ -56,7 +56,7 @@ const isClosed = (item: Item | undefined) =>
   item?.state === 'done' || item?.state === 'dropped';
 
 /** The item's waits that still hold it back */
-export function openWaits(
+function openWaits(
   item: Item,
   byN: ReadonlyMap<number, Item>,
   today: string,
@@ -84,7 +84,7 @@ export const ALL_GROUPS: readonly Group[] = [...OPEN_GROUPS, 'running', 'done'];
 export const byNumber = (queue: Queue): ReadonlyMap<number, Item> =>
   new Map(queue.items.map(item => [item.n, item]));
 
-export function groupOf(
+function groupOf(
   item: Item,
   byN: ReadonlyMap<number, Item>,
   today: string,
@@ -137,7 +137,7 @@ export function groupItems(
 const short = (pr: string) => pr.slice(pr.indexOf('#'));
 
 /** A wait as a short chip */
-export function waitLabel(wait: Wait): string {
+function waitLabel(wait: Wait): string {
   switch (wait.kind) {
     case 'pr':
       return short(wait.pr);
@@ -323,6 +323,55 @@ function checkItem(item: unknown, where: string): asserts item is Item {
   );
   assert(Array.isArray(it.waits), `${where}: waits must be an array`);
   it.waits.forEach((wait, i) => checkWait(wait, `${where} wait ${i}`));
+  for (const key of ['repo', 'source', 'outcome'] as const)
+    assert(it[key] === undefined || typeof it[key] === 'string', `${where}: ${key} must be text`);
+  for (const key of ['started', 'ended'] as const)
+    assert(
+      it[key] === undefined || (typeof it[key] === 'string' && DATE.test(it[key])),
+      `${where}: ${key} must be YYYY-MM-DD`,
+    );
+  const thread = it.thread as Item['thread'];
+  assert(
+    thread === undefined ||
+      (typeof thread?.title === 'string' && (thread.url === undefined || typeof thread.url === 'string')),
+    `${where}: thread must be { title, url? }`,
+  );
+  assert(
+    it.prs === undefined ||
+      (Array.isArray(it.prs) && it.prs.every(pr => typeof pr === 'string' && PR_REF.test(pr))),
+    `${where}: prs must look like owner/repo#123`,
+  );
+  assert(
+    it.notes === undefined ||
+      (Array.isArray(it.notes) &&
+        it.notes.every(note => DATE.test(note?.date) && typeof note?.text === 'string')),
+    `${where}: notes must be { date: YYYY-MM-DD, text }`,
+  );
+}
+
+/** Checks the whole queue: each item, unique numbers, waits on items that exist */
+function checkQueue(queue: Queue) {
+  assert(queue && queue.version === 1, 'version must be 1');
+  assert(Array.isArray(queue.items), 'items must be an array');
+  assert(
+    queue.order === undefined ||
+      (Array.isArray(queue.order) && queue.order.every(n => Number.isInteger(n))),
+    'order must be a list of item numbers',
+  );
+  assert(queue.rules === undefined || typeof queue.rules === 'string', 'rules must be text');
+  const seen = new Set<number>();
+  queue.items.forEach((item, i) => {
+    checkItem(item, `item ${i}`);
+    assert(!seen.has(item.n), `item #${item.n} appears twice`);
+    seen.add(item.n);
+  });
+  for (const item of queue.items)
+    for (const wait of item.waits)
+      if (wait.kind === 'item')
+        assert(
+          wait.item !== item.n && seen.has(wait.item),
+          `item #${item.n} waits on #${wait.item}, which ${wait.item === item.n ? 'is itself' : 'does not exist'}`,
+        );
 }
 
 /** Parses and checks the queue file; throws QueueError saying what is wrong */
@@ -333,16 +382,8 @@ export function parseQueue(text: string): Queue {
   } catch (error) {
     throw new QueueError(`not JSON: ${(error as Error).message}`);
   }
-  const queue = raw as Queue;
-  assert(queue && queue.version === 1, 'version must be 1');
-  assert(Array.isArray(queue.items), 'items must be an array');
-  const seen = new Set<number>();
-  queue.items.forEach((item, i) => {
-    checkItem(item, `item ${i}`);
-    assert(!seen.has(item.n), `item #${item.n} appears twice`);
-    seen.add(item.n);
-  });
-  return queue;
+  checkQueue(raw as Queue);
+  return raw as Queue;
 }
 
 export const serialize = (queue: Queue) => `${JSON.stringify(queue, null, 2)}\n`;
@@ -357,18 +398,28 @@ export function openPrs(queue: Queue): string[] {
   return [...prs];
 }
 
-/** Marks waits on these PRs merged; returns the queue unchanged when none match */
-export function markMerged(queue: Queue, merged: ReadonlySet<string>): Queue {
+/**
+ * Marks waits on merged PRs merged, and turns a wait on a PR closed without
+ * merging into a question for the person; unchanged when none match
+ */
+export function settlePrs(
+  queue: Queue,
+  merged: ReadonlySet<string>,
+  closed: ReadonlySet<string> = new Set(),
+): Queue {
+  const settle = (w: Wait): Wait =>
+    w.kind !== 'pr' || w.isMerged ? w
+    : merged.has(w.pr) ? { ...w, isMerged: true }
+    : closed.has(w.pr) ?
+      { kind: 'decision', ask: `${w.pr} closed without merging: drop this item, or wait on another PR?` }
+    : w;
   let changed = false;
   const items = queue.items.map(item => {
-    if (!item.waits.some(w => w.kind === 'pr' && !w.isMerged && merged.has(w.pr)))
-      return item;
+    if (!item.waits.some(w => settle(w) !== w)) return item;
     changed = true;
     return {
       ...item,
-      waits: item.waits.map(w =>
-        w.kind === 'pr' && merged.has(w.pr) ? { ...w, isMerged: true } : w,
-      ),
+      waits: item.waits.map(settle),
     };
   });
   return changed ? { ...queue, items } : queue;
@@ -458,6 +509,18 @@ export function runTool(
   input: ToolInput,
   today: string,
 ): { text: string; queue?: Queue } {
+  const unknown = Object.keys(input).filter(key => !(key in TOOL_SCHEMA.properties));
+  assert(unknown.length === 0, `unknown field ${unknown.join(', ')}; waits go in addWaits`);
+  const ran = runAction(queue, input, today);
+  if (ran.queue) checkQueue(ran.queue);
+  return ran;
+}
+
+function runAction(
+  queue: Queue,
+  input: ToolInput,
+  today: string,
+): { text: string; queue?: Queue } {
   switch (input.action) {
     case 'list':
       return { text: summaryText(queue, today, { withDone: input.withDone }) };
@@ -499,7 +562,11 @@ function patch(item: Item, input: ToolInput, today: string): Item {
     next.state = input.state;
     if (input.state === 'running') next.started ??= today;
     if (input.state === 'done' || input.state === 'dropped') next.ended = today;
-    if (input.state === 'queued') delete next.ended;
+    else {
+      // reopened: its old end no longer applies
+      delete next.ended;
+      if (input.outcome === undefined) delete next.outcome;
+    }
   }
   if (input.clearWaits?.length) {
     const drop = new Set(input.clearWaits.map(waitKey));
