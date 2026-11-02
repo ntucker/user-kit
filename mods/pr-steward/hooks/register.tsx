@@ -97,7 +97,13 @@ async function markReady($: EngineInterface) {
 async function land($: EngineInterface): Promise<string> {
   const snapshot = await refresh($);
   if (snapshot.kind !== 'pr') return summary(snapshot);
-  await $.prompt.submit({ text: landPrompt(snapshot) });
+  // /land's command.run hook holds the turn a submit would wait on, so submit after it
+  const text = landPrompt(snapshot);
+  $.clock.after(0, () =>
+    void $.prompt
+      .submit({ text })
+      .catch(error => $.ui.toast(`Could not start /land: ${(error as Error).message}`)),
+  );
   return 'Landing this branch’s pull request.';
 }
 

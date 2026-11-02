@@ -265,11 +265,12 @@ describe('pane', () => {
   });
 
   test('Land asks the model to work every open item', async ($, on) => {
-    fakeHost(on);
+    const clock = fakeHost(on);
     const prompts = capturePrompts(on);
     await $.tool.call({ tool: 'mcp__pr-steward__pr_status' });
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' });
     await ui.press({ key: 'land' });
+    await clock.advance(1);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain('Land this pull request');
     expect(prompts[0]).toContain('FAILING ci/circleci: lint');
@@ -379,6 +380,21 @@ test('the status line shows a failed read only while tracking a PR', async ($, o
   failure = exited(1, '', 'rate limited\ntry later');
   await read();
   expect(lines.at(-1)).toBe('PR read failed: rate limited');
+});
+
+test('/land asks the model to land the PR', async ($, on) => {
+  const clock = fakeHost(on);
+  const prompts = capturePrompts(on);
+  const ran = await $.command.run({
+    command: 'land',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  });
+  expect(ran.text).toBe('Landing this branch’s pull request.');
+  await clock.advance(1);
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain('Land this pull request');
 });
 
 test('/land without a PR says so and submits nothing', async ($, on) => {
