@@ -116,6 +116,10 @@ function compare(order: readonly number[]) {
     a.n - b.n;
 }
 
+/** Ended items, the most recent end first */
+const newestEnded = (a: Item, b: Item) =>
+  (b.ended ?? '').localeCompare(a.ended ?? '') || b.n - a.n;
+
 export type Grouped = Record<Group, Item[]>;
 
 export function groupItems(
@@ -136,10 +140,7 @@ export function groupItems(
     grouped[groupOf(item, byN, today)].push(item);
   const sort = compare(queue.order ?? []);
   for (const group of ALL_GROUPS) if (group !== 'done') grouped[group].sort(sort);
-  // newest first
-  grouped.done.sort((a, b) =>
-    (b.ended ?? '').localeCompare(a.ended ?? '') || b.n - a.n,
-  );
+  grouped.done.sort(newestEnded);
   return grouped;
 }
 
@@ -300,7 +301,7 @@ function checkWait(wait: unknown, where: string): asserts wait is Wait {
       );
       return;
     case 'item':
-      assert(Number.isInteger(w.item), `${where}: item must be a number`);
+      assert(Number.isInteger(w.item) && (w.item as number) > 0, `${where}: item must be an item number`);
       return;
     case 'event':
       assert(typeof w.what === 'string' && w.what, `${where}: event needs what`);
@@ -359,7 +360,7 @@ function checkItem(item: unknown, where: string): asserts item is Item {
 }
 
 /** The highest item number ever used, archived items included */
-const lastN = (queue: Queue) =>
+export const highestN = (queue: Queue) =>
   Math.max(queue.lastN ?? 0, ...queue.items.map(item => item.n));
 
 /** Checks the whole queue: each item, unique numbers, waits on numbers in use */
@@ -382,7 +383,7 @@ function checkQueue(queue: Queue) {
     assert(!seen.has(item.n), `item #${item.n} appears twice`);
     seen.add(item.n);
   });
-  const last = lastN(queue);
+  const last = highestN(queue);
   // a number in use but not in the file was archived (or removed by hand): that wait has cleared
   for (const item of queue.items)
     for (const wait of item.waits)
@@ -460,12 +461,12 @@ export function settlePrs(
   return changed ? { ...queue, items } : queue;
 }
 
-/** Items of `ready` (the new queue's) that were not ready in `before` */
-export function newlyReady(before: Queue, ready: readonly Item[], today: string): Item[] {
+/** Items of `ready` (the new queue's) that were not ready in `before`, as of `beforeDay` */
+export function newlyReady(before: Queue, beforeDay: string, ready: readonly Item[]): Item[] {
   const byN = byNumber(before);
   return ready.filter(item => {
     const was = byN.get(item.n);
-    return !was || groupOf(was, byN, today) !== 'ready';
+    return !was || groupOf(was, byN, beforeDay) !== 'ready';
   });
 }
 
@@ -547,7 +548,7 @@ export function runTool(
   queue: Queue,
   input: ToolInput,
   today: string,
-  archived: readonly Item[] = [],
+  archived: readonly Item[],
 ): { text: string; queue?: Queue } {
   const unknown = Object.keys(input).filter(key => !(key in TOOL_SCHEMA.properties));
   assert(unknown.length === 0, `unknown field ${unknown.join(', ')}; waits go in addWaits`);
@@ -555,22 +556,32 @@ export function runTool(
   const ran = runAction(queue, input, today, archived);
   if (ran.queue) {
     checkQueue(ran.queue);
-    if (input.addWaits?.length) checkNoCycle(ran.queue, input.n ?? lastN(ran.queue));
+    for (const n of newItemWaits(queue, input))
+      assert(archived.some(item => item.n === n), `no item #${n} in the queue or its archive`);
+    if (input.addWaits?.length && ran.n !== undefined) checkNoCycle(ran.queue, ran.n);
   }
-  return ran;
+  return { text: ran.text, ...(ran.queue && { queue: ran.queue }) };
 }
 
-/** Whether `input` reads the archive: a history search, or getting an item no longer in the queue */
+/** Item numbers `input` adds waits on that are not in the queue: they must be archived */
+const newItemWaits = (queue: Queue, input: ToolInput) =>
+  (input.addWaits ?? []).flatMap(wait =>
+    wait.kind === 'item' && !queue.items.some(item => item.n === wait.item) ? [wait.item] : [],
+  );
+
+/** Whether `input` reads the archive: a history search, getting or updating an item no longer in the queue, or waiting on one */
 export const needsArchive = (queue: Queue, input: ToolInput) =>
   input.action === 'history' ||
-  (input.action === 'get' && !queue.items.some(item => item.n === input.n));
+  ((input.action === 'get' || input.action === 'update') &&
+    !queue.items.some(item => item.n === input.n)) ||
+  newItemWaits(queue, input).length > 0;
 
 function runAction(
   queue: Queue,
   input: ToolInput,
   today: string,
   archived: readonly Item[],
-): { text: string; queue?: Queue } {
+): { text: string; queue?: Queue; n?: number } {
   switch (input.action) {
     case 'list':
       return { text: summaryText(queue, today, { withDone: input.withDone }) };
@@ -583,25 +594,28 @@ function runAction(
       return { text: historyText(archived, input.query ?? '') };
     case 'add': {
       assert(input.title && input.brief !== undefined, 'add needs title and brief');
-      const n = lastN(queue) + 1;
+      const n = highestN(queue) + 1;
       const item = patch(
         { n, title: input.title, brief: input.brief, state: 'queued', waits: [] },
         input,
         today,
       );
       const next = { ...queue, items: [...queue.items, item] };
-      return { text: `Added:\n${itemText(next, n, today)}`, queue: next };
+      return { text: `Added:\n${itemText(next, n, today)}`, queue: next, n };
     }
     case 'update': {
       assert(input.n !== undefined, 'update needs n');
       const found = queue.items.find(item => item.n === input.n);
-      assert(found, `no item #${input.n}`);
-      const updated = patch(found, input, today);
+      // an archived item comes back to the queue; its newer copy there wins over the archive's
+      const restored = found ? undefined : archived.find(item => item.n === input.n);
+      assert(found ?? restored, `no item #${input.n}`);
+      const updated = patch((found ?? restored)!, input, today);
       const next = {
         ...queue,
-        items: queue.items.map(item => (item === found ? updated : item)),
+        items: found ? queue.items.map(item => (item === found ? updated : item)) : [...queue.items, updated],
       };
-      return { text: `Updated:\n${itemText(next, input.n, today)}`, queue: next };
+      const verb = found ? 'Updated' : 'Restored from the archive';
+      return { text: `${verb}:\n${itemText(next, input.n, today)}`, queue: next, n: input.n };
     }
     default:
       throw new QueueError('action must be list, get, add, update or history');
@@ -647,11 +661,11 @@ export function historyText(archived: readonly Item[], query: string): string {
       .toLowerCase();
   const found = archived
     .filter(item => words.every(word => haystack(item).includes(word)))
-    .sort((a, b) => (b.ended ?? '').localeCompare(a.ended ?? '') || b.n - a.n);
+    .sort(newestEnded);
   if (found.length === 0) return query ? `No archived item matches "${query}".` : 'The archive is empty.';
   const lines = found
     .slice(0, HISTORY_LIMIT)
-    .map(item => `  #${item.n} ${item.title} [${item.state} ${item.ended ?? ''}${item.outcome ? `: ${item.outcome}` : ''}]`);
+    .map(item => `  #${item.n} ${item.title} [${[item.state, item.ended].filter(Boolean).join(' ')}${item.outcome ? `: ${item.outcome}` : ''}]`);
   const more = found.length - HISTORY_LIMIT;
   return [`Archived (${found.length})`, ...lines, ...(more > 0 ? [`  …and ${more} more; narrow the query`] : [])].join('\n');
 }
@@ -667,7 +681,7 @@ export function prune(queue: Queue, cutoff: string): { queue: Queue; archived: I
   const keep = queue.items.filter(item => !archived.includes(item));
   const order = queue.order?.filter(n => keep.some(item => item.n === n));
   return {
-    queue: { ...queue, lastN: lastN(queue), ...(order && { order }), items: keep },
+    queue: { ...queue, lastN: highestN(queue), ...(order && { order }), items: keep },
     archived,
   };
 }

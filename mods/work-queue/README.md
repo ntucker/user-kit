@@ -64,7 +64,7 @@ Set in `/config` or settings.json `pluginConfigs["work-queue"].options`:
 
 ## The archive
 
-Each change to the queue first moves items that ended more than `archiveAfterDays` ago into the archive: one item per line, as JSON, added to the end. The queue keeps `lastN`, the highest number used, so new items never take an archived number, and a wait on an archived item counts as cleared. The archive is read only to show an item no longer in the queue (`get`, `/queue <n>`) or to search it (`history`, `/queue history [words]`). If a write is cut short between the two files, an item can be in both; the queue's copy is the one shown.
+Each change to the queue first moves items that ended more than `archiveAfterDays` ago into the archive: one item per line, as JSON, added at the end. The plugin API has no append or rename, so the archive is rewritten with the new lines, then read back; lines another session's write replaced are added again. The queue keeps `lastN`, the highest number used, so new items never take an archived number. A wait on an archived item counts as cleared; adding a wait on a number in neither file is refused. The archive is read only to show an item no longer in the queue (`get`, `/queue <n>`), to search it (`history`, `/queue history [words]`), or to bring an item back: `update` on an archived number restores it to the queue. Nothing is ever removed from the archive. If a write is cut short between the two files, an item can be in both; the queue's copy wins.
 
 ## Sharing the file
 
@@ -72,7 +72,7 @@ The file is re-read when its modification time changes (checked every 20 seconds
 
 ### Why not Claude Code's task list
 
-Claude Code's built-in tasks track steps within a session or team, with `blockedBy` between tasks. This queue holds work that has not started yet, across sessions and machines that only share a folder, and its items wait on things outside the list: a PR merging, a person's decision, a date. Use tasks for the steps of a running item, and this queue for what runs next.
+Claude Code's built-in tasks (TaskCreate, TaskList) track steps within a session or team, with `blockedBy` between tasks. They are kept under `~/.claude/tasks` on the machine running the session, so sessions on other machines or in separate cloud containers do not see them. This queue holds work that has not started yet, across sessions and machines that only share a folder, and its items wait on things outside the list: a PR merging, a person's decision, a date. Use tasks for the steps of a running item, and this queue for what runs next.
 
 ## Install
 

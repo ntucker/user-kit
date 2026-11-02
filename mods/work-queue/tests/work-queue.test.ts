@@ -104,24 +104,24 @@ describe('grouping', () => {
 
 describe('queue tool logic', () => {
   test('add numbers past the highest item', async () => {
-    const ran = runTool(QUEUE, { action: 'add', title: 'New', brief: 'B' }, TODAY);
+    const ran = runTool(QUEUE, { action: 'add', title: 'New', brief: 'B' }, TODAY, []);
     expect(ran.queue?.items.at(-1)).toEqual(item(12, { title: 'New', brief: 'B' }));
   });
 
   test('update stamps start and end dates and edits waits', async () => {
-    const started = runTool(QUEUE, { action: 'update', n: 4, state: 'running', thread: { title: 'T' } }, TODAY);
+    const started = runTool(QUEUE, { action: 'update', n: 4, state: 'running', thread: { title: 'T' } }, TODAY, []);
     const four = started.queue?.items.find(one => one.n === 4);
     expect(four?.started).toBe(TODAY);
     expect(four?.thread).toEqual({ title: 'T' });
 
-    const done = runTool(QUEUE, { action: 'update', n: 6, state: 'done', outcome: 'Merged #1' }, TODAY);
+    const done = runTool(QUEUE, { action: 'update', n: 6, state: 'done', outcome: 'Merged #1' }, TODAY, []);
     // item 5 waited on item 6 and is now ready
     expect(ns(groupItems(done.queue!, TODAY).ready)).toContain(5);
 
     const edited = runTool(
       QUEUE,
       { action: 'update', n: 11, clearWaits: [{ kind: 'decision', ask: 'Is it final?' }], addWaits: [{ kind: 'item', item: 2 }], note: 'asked' },
-      TODAY,
+      TODAY, [],
     );
     const eleven = edited.queue?.items.find(one => one.n === 11);
     expect(eleven?.waits).toEqual([
@@ -133,31 +133,41 @@ describe('queue tool logic', () => {
 
   test('refuses bad input with a reason', async () => {
     expect(() =>
-      runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'pr', pr: '4349' }] }, TODAY),
+      runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'pr', pr: '4349' }] }, TODAY, []),
     ).toThrow(QueueError);
-    expect(() => runTool(QUEUE, { action: 'update', n: 99 }, TODAY)).toThrow('no item #99');
+    expect(() => runTool(QUEUE, { action: 'update', n: 99 }, TODAY, [])).toThrow('no item #99');
     expect(() => parseQueue('{"version":1,"items":[{"n":1,"title":"a","brief":"","state":"open","waits":[]}]}')).toThrow(
       'state must be',
     );
     expect(() => parseQueue(JSON.stringify({ version: 1, items: [item(1), item(1)] }))).toThrow('appears twice');
-    expect(() => runTool(QUEUE, { action: 'add', title: 't', brief: 'b', waits: [] } as never, TODAY)).toThrow(
+    expect(() => runTool(QUEUE, { action: 'add', title: 't', brief: 'b', waits: [] } as never, TODAY, [])).toThrow(
       'waits go in addWaits',
     );
-    expect(() => runTool(QUEUE, { action: 'update', n: 1, clearWaits: [null as never] }, TODAY)).toThrow(QueueError);
-    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 1 }] }, TODAY)).toThrow(
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, clearWaits: [null as never] }, TODAY, [])).toThrow(QueueError);
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 1 }] }, TODAY, [])).toThrow(
       'waits on itself',
     );
-    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 40 }] }, TODAY)).toThrow(
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 0 }] }, TODAY, [])).toThrow(
+      'item must be an item number',
+    );
+    expect(() => runTool(QUEUE, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 40 }] }, TODAY, [])).toThrow(
       'does not exist',
     );
+    // below lastN but never in the archive
+    expect(() =>
+      runTool({ ...QUEUE, lastN: 30 }, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 25 }] }, TODAY, [item(24)]),
+    ).toThrow('no item #25 in the queue or its archive');
+    expect(
+      runTool({ ...QUEUE, lastN: 30 }, { action: 'update', n: 1, addWaits: [{ kind: 'item', item: 24 }] }, TODAY, [item(24)]).queue,
+    ).toBeDefined();
     // 5 waits on 6, so 6 waiting on 5 would never clear
-    expect(() => runTool(QUEUE, { action: 'update', n: 6, addWaits: [{ kind: 'item', item: 5 }] }, TODAY)).toThrow(
+    expect(() => runTool(QUEUE, { action: 'update', n: 6, addWaits: [{ kind: 'item', item: 5 }] }, TODAY, [])).toThrow(
       '#6 would wait on itself through #5',
     );
   });
 
   test('reopening an item clears its end', async () => {
-    const reopened = runTool(QUEUE, { action: 'update', n: 9, state: 'queued' }, TODAY);
+    const reopened = runTool(QUEUE, { action: 'update', n: 9, state: 'queued' }, TODAY, []);
     const nine = reopened.queue?.items.find(one => one.n === 9);
     expect(nine?.ended).toBeUndefined();
     expect(nine?.outcome).toBeUndefined();
@@ -201,7 +211,7 @@ describe('archive', () => {
     expect(parseQueue(JSON.stringify(queue))).toEqual(queue);
     // the next number skips archived ones
     const top = prune({ ...OLD, items: OLD.items.filter(one => one.n !== 4) }, TODAY).queue;
-    expect(runTool(top, { action: 'add', title: 'New', brief: 'B' }, TODAY).queue?.items.at(-1)?.n).toBe(4);
+    expect(runTool(top, { action: 'add', title: 'New', brief: 'B' }, TODAY, []).queue?.items.at(-1)?.n).toBe(4);
     expect(prune(queue, '2026-01-01').queue).toBe(queue);
   });
 
@@ -391,6 +401,17 @@ describe('the plugin', () => {
     expect(await queueTool($, { action: 'get', n: 1 })).toContain('Ended: 2026-10-01: Shipped\n');
     expect((await run($, 'history ship')).text).toContain('#1 Item 1 [done 2026-10-01: Shipped]');
     expect((await queueTool($, { action: 'add', title: 'Next', brief: 'B' }))).toContain('#3 Next');
+    // updating an archived item brings it back
+    expect(await queueTool($, { action: 'update', n: 1, state: 'queued' })).toContain('Restored from the archive');
+    expect(ns(fs.read().items)).toEqual([2, 3, 1]);
+  });
+
+  test('a new queue file numbers past the archive', async ($, on) => {
+    const fs = await fakeFs(on);
+    capture(on);
+    // its last line was cut short
+    fs.put('work-queue.archive.jsonl', JSON.stringify(item(7, { state: 'done' })));
+    expect(await queueTool($, { action: 'add', title: 'Fresh', brief: 'B' })).toContain('#8 Fresh');
   });
 
   test('keeps finished items when archiving is off', { options: { archiveAfterDays: 0 } }, async ($, on) => {
@@ -463,6 +484,20 @@ describe('the plugin', () => {
     ]);
     expect(toasts).toEqual(['Queue #4 is ready: Item 4']);
     expect(status.at(-1)).toBe('queue 5 ready · 2 need you · 1 running');
+  });
+
+  test('toasts items whose date passed when the day changes', async ($, on) => {
+    const { clock } = await fakeFs(on, QUEUE);
+    const { toasts } = capture(on);
+    on('session.start', (_, e) => ({ cwd: e.cwd }));
+    on('command.register', (_, e) => ({ value: { command: e.name } }));
+    on('tool.register', (_, e) => ({ value: { tool: e.name } }));
+    await queueTool($, { action: 'list' });
+    await clock.set(Date.parse('2026-11-08T12:00:00Z'));
+    // starts the poll and re-reads the file on the new day
+    await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true });
+    await clock.advance(1);
+    expect(toasts).toEqual(['Queue #7 is ready: Item 7']);
   });
 
   test('the pane groups items and opens one', async ($, on) => {

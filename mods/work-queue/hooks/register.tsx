@@ -86,8 +86,9 @@ async function today($: EngineInterface) {
 
 /** The file's mtime, or undefined while it does not exist */
 async function mtimeOf($: EngineInterface): Promise<number | undefined> {
-  const stat = await $.fs.stat(options.file).catch(() => undefined);
-  return stat?.mtimeMs;
+  // only a file that is not there counts as missing: any other error must not look like an empty queue
+  if (!(await $.fs.exists(options.file))) return undefined;
+  return (await $.fs.stat(options.file)).mtimeMs;
 }
 
 /** The file as a snapshot, with the text it was read from */
@@ -107,19 +108,18 @@ async function readFile($: EngineInterface): Promise<QueueSnapshot> {
 }
 
 /** The text on disk now, or undefined while there is no file */
-const textNow = ($: EngineInterface) =>
-  $.fs.read(options.file).catch(async error => {
-    if ((await mtimeOf($)) === undefined) return undefined;
-    throw error;
-  });
+const textNow = async ($: EngineInterface) =>
+  (await $.fs.exists(options.file)) ? $.fs.read(options.file) : undefined;
 
 async function readArchive($: EngineInterface) {
-  const exists = await $.fs.stat(archivePath()).then(() => true, () => false);
-  return exists ? parseArchive(await $.fs.read(archivePath())) : [];
+  return (await $.fs.exists(archivePath())) ? parseArchive(await $.fs.read(archivePath())) : [];
 }
 
 const sameSnapshot = (a: QueueSnapshot | null, b: QueueSnapshot) =>
-  a?.kind === b.kind && (a.kind !== 'ok' || (b.kind === 'ok' && a.mtimeMs === b.mtimeMs));
+  a !== null &&
+  (a.kind === 'ok' ? b.kind === 'ok' && a.mtimeMs === b.mtimeMs
+  : a.kind === 'error' ? b.kind === 'error' && a.message === b.message
+  : b.kind === 'missing');
 
 /** Shows a new snapshot: state, status line, toasts for newly ready items */
 async function show($: EngineInterface, next: QueueSnapshot) {
@@ -131,11 +131,12 @@ async function show($: EngineInterface, next: QueueSnapshot) {
     return;
   }
   const day = await today($);
+  const dayBefore = shownDay ?? day;
   shownDay = day;
   const grouped = groupItems(next.queue, day);
   $.ui.status(statusText(grouped));
   if (previous?.kind === 'ok')
-    for (const item of newlyReady(previous.queue, grouped.ready, day))
+    for (const item of newlyReady(previous.queue, dayBefore, grouped.ready))
       $.ui.toast(`Queue #${item.n} is ready: ${item.title}`);
   syncPrPoll($, next);
 }
@@ -174,12 +175,16 @@ const WRITE_TRIES = 3;
 function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
     const day = await today($);
+    // only a change can start a missing file
+    const isRead = input.action !== 'add' && input.action !== 'update';
     for (let tries = 1; tries <= WRITE_TRIES; tries++) {
       const { snapshot: onDisk, text } = await load($);
-      const isRead = input.action !== 'add' && input.action !== 'update';
       if (onDisk.kind === 'error' || (onDisk.kind === 'missing' && isRead))
         throw new QueueError(describe(onDisk));
-      const queue: Queue = onDisk.kind === 'ok' ? onDisk.queue : { version: 1, items: [] };
+      const queue: Queue =
+        onDisk.kind === 'ok' ? onDisk.queue
+          // a new file still numbers past the archive
+        : { version: 1, lastN: Math.max(0, ...(await readArchive($)).map(item => item.n)), items: [] };
       const archived = needsArchive(queue, input) ? await readArchive($) : [];
       const ran = runTool(queue, input, day, archived);
       if (!ran.queue) {
@@ -205,14 +210,27 @@ async function write($: EngineInterface, full: Queue, day: string) {
     options.archiveAfterDays > 0 ?
       prune(full, daysBefore(day, options.archiveAfterDays))
     : { queue: full, archived: [] };
-  if (archived.length) {
-    const exists = await $.fs.stat(archivePath()).then(() => true, () => false);
-    const before = exists ? await $.fs.read(archivePath()) : '';
-    await $.fs.write(archivePath(), before + archiveLines(archived));
-  }
+  if (archived.length) await addToArchive($, archived);
   await $.fs.write(options.file, serialize(queue));
   if (options.markdown) await $.fs.write(options.markdown, toMarkdown(queue, day));
   await show($, { kind: 'ok', queue, mtimeMs: (await mtimeOf($)) ?? 0 });
+}
+
+/**
+ * Adds items to the end of the archive, then reads it back: another session
+ * writing it at the same moment could have replaced the file without them
+ */
+async function addToArchive($: EngineInterface, items: readonly Item[]) {
+  let missing = items;
+  for (let tries = 1; missing.length > 0; tries++) {
+    if (tries > WRITE_TRIES) throw new QueueError('the archive kept changing while items moved to it; try again');
+    const before = (await $.fs.exists(archivePath())) ? await $.fs.read(archivePath()) : '';
+    // a last line cut short must not swallow the first new one
+    const joined = before && !before.endsWith('\n') ? `${before}\n` : before;
+    await $.fs.write(archivePath(), joined + archiveLines(missing));
+    const lines = await $.fs.read(archivePath());
+    missing = missing.filter(item => !lines.includes(archiveLines([item])));
+  }
 }
 
 /** Settles waits on PRs gh reports merged, or closed without merging */
@@ -289,7 +307,9 @@ async function command($: EngineInterface, args: string): Promise<string> {
 }
 
 export const register: Register = (on, rawOptions) => {
-  options = rawOptions as unknown as Options;
+  const raw = rawOptions as unknown as Options;
+  const days = Math.floor(Number(raw.archiveAfterDays));
+  options = { ...raw, archiveAfterDays: Number.isFinite(days) && days >= 0 ? days : 14 };
 
   on('session.start', async ($, e, next) => {
     await Promise.all([
@@ -305,7 +325,7 @@ export const register: Register = (on, rawOptions) => {
         isDeferred: false,
       }),
     ]);
-    poll ??= $.clock.every(POLL_MS, () => void refresh($));
+    poll ??= $.clock.every(POLL_MS, () => void refresh($).catch(() => undefined));
     void refresh($, true);
     return next(e);
   });
