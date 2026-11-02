@@ -59,7 +59,11 @@ Set in `/config` or settings.json `pluginConfigs["work-queue"].options`:
 | `markdown` | none | Also write a readable Markdown copy here after each change, for readers without the plugin |
 | `checkPrs` | `true` | Clear PR waits once `gh` reports them merged |
 
-The file is re-read when its modification time changes (checked every 20 seconds), and each change re-reads it first, so sessions sharing the file through a synced or network folder keep each other's edits. Two writes within the same moment can still race; the last one wins.
+The file is re-read when its modification time changes (checked every 20 seconds). Each change re-reads it first, and runs again on the newer file if another session wrote in between, so sessions sharing the file through a synced or network folder keep each other's edits; waits are removed by what they name, never by position. Two writes in the same instant can still race, and the last one wins. Dates (`started`, `ended`, notes, an event's `after`) are the local calendar day.
+
+### Why not Claude Code's task list
+
+Claude Code's built-in tasks track steps within a session or team, with `blockedBy` between tasks. This queue holds work that has not started yet, across sessions and machines that only share a folder, and its items wait on things outside the list: a PR merging, a person's decision, a date. Use tasks for the steps of a running item, and this queue for what runs next.
 
 ## Install
 

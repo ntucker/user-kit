@@ -115,19 +115,29 @@ async function currentQueue($: EngineInterface): Promise<Queue> {
   return snapshot.queue;
 }
 
+/** Tries before giving up when other sessions keep changing the file */
+const WRITE_TRIES = 3;
+
 /**
  * Runs a tool input against the file as it is now, so others' edits survive,
- * and writes it back when it changed. Throws QueueError for a bad input.
+ * and writes it back when it changed; if another session wrote in between,
+ * runs it again on theirs. Throws QueueError for a bad input.
  */
 function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
     const day = await today($);
-    const read = await readFile($);
-    if (read.kind === 'error') throw new QueueError(describe(read));
-    const queue: Queue = read.kind === 'ok' ? read.queue : { version: 1, items: [] };
-    const ran = runTool(queue, input, day);
-    if (ran.queue) await write($, ran.queue, day);
-    return ran.text;
+    for (let tries = 1; ; tries++) {
+      const read = await readFile($);
+      if (read.kind === 'error') throw new QueueError(describe(read));
+      const queue: Queue = read.kind === 'ok' ? read.queue : { version: 1, items: [] };
+      const ran = runTool(queue, input, day);
+      if (!ran.queue) return ran.text;
+      const isUnchanged = (await mtimeOf($)) === (read.kind === 'ok' ? read.mtimeMs : undefined);
+      if (isUnchanged || tries === WRITE_TRIES) {
+        await write($, ran.queue, day);
+        return ran.text;
+      }
+    }
   });
 }
 

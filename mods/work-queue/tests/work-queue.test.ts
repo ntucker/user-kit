@@ -115,7 +115,7 @@ describe('queue tool logic', () => {
 
     const edited = runTool(
       QUEUE,
-      { action: 'update', n: 11, clearWaits: [1], addWaits: [{ kind: 'item', item: 2 }], note: 'asked' },
+      { action: 'update', n: 11, clearWaits: [{ kind: 'decision', ask: 'Is it final?' }], addWaits: [{ kind: 'item', item: 2 }], note: 'asked' },
       TODAY,
     );
     const eleven = edited.queue?.items.find(one => one.n === 11);
@@ -153,9 +153,14 @@ async function fakeFs(on: On, initial?: Queue) {
   };
   if (initial) put(FILE, JSON.stringify(initial));
   on('fs.exists', async ($, e) => ({ value: files.has(name(e.path)) }));
+  /** Runs once, right after the next read: another session writing then */
+  let afterRead: (() => void) | undefined;
   on('fs.read', async ($, e) => {
     const text = files.get(name(e.path));
     if (text === undefined) throw new Error('ENOENT');
+    const after = afterRead;
+    afterRead = undefined;
+    after?.();
     return { value: text };
   });
   on('fs.write', async ($, e) => {
@@ -167,7 +172,15 @@ async function fakeFs(on: On, initial?: Queue) {
     if (text === undefined) throw new Error('ENOENT');
     return { value: { kind: 'file', size: text.length, mtimeMs: mtime.get(name(e.path))!, isLink: false } };
   });
-  return { clock, files, put, read: () => parseQueue(files.get(FILE)!) };
+  return {
+    clock,
+    files,
+    put,
+    read: () => parseQueue(files.get(FILE)!),
+    onNextRead: (run: () => void) => {
+      afterRead = run;
+    },
+  };
 }
 
 /** gh answers MERGED for the PRs in `merged` */
@@ -253,7 +266,7 @@ describe('the plugin', () => {
   test('writes a markdown copy when configured', { options: { markdown: 'queue.md' } }, async ($, on) => {
     const fs = await fakeFs(on, QUEUE);
     capture(on);
-    await queueTool($, { action: 'update', n: 2, clearWaits: [0] });
+    await queueTool($, { action: 'update', n: 2, clearWaits: [{ kind: 'decision', ask: 'Pick a or b?' }] });
     expect(fs.files.get('queue.md')).toContain('# Work queue');
     expect(fs.files.get('queue.md')).toContain('### 2. Item 2');
   });
@@ -268,6 +281,16 @@ describe('the plugin', () => {
     const ns20 = fs.read().items.map(one => one.n);
     expect(ns20).toContain(20);
     expect(fs.read().items.find(one => one.n === 1)?.state).toBe('running');
+  });
+
+  test('runs a change again when another session wrote while it ran', async ($, on) => {
+    const fs = await fakeFs(on, QUEUE);
+    capture(on);
+    fs.onNextRead(() =>
+      fs.put(FILE, JSON.stringify({ ...QUEUE, items: [...QUEUE.items, item(12)] })),
+    );
+    expect(await queueTool($, { action: 'add', title: 'Mine', brief: 'B' })).toContain('#13 Mine');
+    expect(fs.read().items.slice(-2).map(one => one.n)).toEqual([12, 13]);
   });
 
   test('a bad call answers with the reason and leaves the file alone', async ($, on) => {

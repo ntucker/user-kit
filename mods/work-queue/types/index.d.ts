@@ -78,8 +78,8 @@ export type ToolInput = {
   source?: string;
   /** Adds waits */
   addWaits?: Wait[];
-  /** Removes waits by their index in `get`'s list */
-  clearWaits?: number[];
+  /** Removes waits, matched by kind and what they name */
+  clearWaits?: Wait[];
   thread?: { title: string; url?: string };
   /** Adds PRs */
   prs?: string[];

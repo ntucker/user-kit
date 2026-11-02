@@ -32,7 +32,25 @@ const PRIORITIES: readonly Priority[] = ['high', 'normal', 'low'];
 const PR_REF = /^[\w.-]+\/[\w.-]+#\d+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+/** The local calendar day, YYYY-MM-DD, as people type dates */
+export const isoDay = (date: Date) =>
+  [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map(part => String(part).padStart(2, '0'))
+    .join('-');
+
+/** A wait's identity: its kind and what it names, so edits never go by position */
+const waitKey = (wait: Wait) => {
+  switch (wait.kind) {
+    case 'pr':
+      return `pr:${wait.pr}`;
+    case 'item':
+      return `item:${wait.item}`;
+    case 'event':
+      return `event:${wait.what}`;
+    case 'decision':
+      return `decision:${wait.ask}`;
+  }
+};
 
 const isClosed = (item: Item | undefined) =>
   item?.state === 'done' || item?.state === 'dropped';
@@ -219,9 +237,9 @@ function itemLines(
   lines.push('', item.brief);
   if (item.waits.length) {
     lines.push('', 'Waits on:');
-    item.waits.forEach((wait, i) =>
+    item.waits.forEach(wait =>
       lines.push(
-        `  ${i}. ${wait.kind}: ${waitLabel(wait)}${open.includes(wait) ? '' : ' (cleared)'}`,
+        `  - ${wait.kind}: ${waitLabel(wait)}${open.includes(wait) ? '' : ' (cleared)'}`,
       ),
     );
   }
@@ -396,8 +414,9 @@ export const TOOL_SCHEMA = {
     },
     clearWaits: {
       type: 'array',
-      items: { type: 'integer' },
-      description: 'Indexes of waits to remove, as get numbers them',
+      items: { $ref: '#/$defs/wait' },
+      description:
+        'Waits to remove, matched by kind and the pr, item, what or ask they name (after is ignored); one already gone is skipped',
     },
     thread: {
       type: 'object',
@@ -483,8 +502,8 @@ function patch(item: Item, input: ToolInput, today: string): Item {
     if (input.state === 'queued') delete next.ended;
   }
   if (input.clearWaits?.length) {
-    const drop = new Set(input.clearWaits);
-    next.waits = next.waits.filter((_, i) => !drop.has(i));
+    const drop = new Set(input.clearWaits.map(waitKey));
+    next.waits = next.waits.filter(wait => !drop.has(waitKey(wait)));
   }
   if (input.addWaits) next.waits = [...next.waits, ...input.addWaits];
   if (input.prs?.length)
