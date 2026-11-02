@@ -558,9 +558,9 @@ export function runTool(
     checkQueue(ran.queue);
     for (const n of newItemWaits(queue, input))
       assert(archived.some(item => item.n === n), `no item #${n} in the queue or its archive`);
-    if (input.addWaits?.length && ran.n !== undefined) checkNoCycle(ran.queue, ran.n);
+    if (input.addWaits?.length) checkNoCycle(ran.queue, input.n ?? highestN(ran.queue));
   }
-  return { text: ran.text, ...(ran.queue && { queue: ran.queue }) };
+  return ran;
 }
 
 /** Item numbers `input` adds waits on that are not in the queue: they must be archived */
@@ -581,14 +581,14 @@ function runAction(
   input: ToolInput,
   today: string,
   archived: readonly Item[],
-): { text: string; queue?: Queue; n?: number } {
+): { text: string; queue?: Queue } {
   switch (input.action) {
     case 'list':
       return { text: summaryText(queue, today, { withDone: input.withDone }) };
     case 'get': {
       assert(input.n !== undefined, 'get needs n');
       const old = queue.items.some(item => item.n === input.n) ? undefined : archived.find(item => item.n === input.n);
-      return { text: old ? `${itemText({ version: 1, items: [old] }, old.n, today)}\n(archived)` : itemText(queue, input.n, today) };
+      return { text: old ? [...itemLines(old, new Map(), today), '(archived)'].join('\n') : itemText(queue, input.n, today) };
     }
     case 'history':
       return { text: historyText(archived, input.query ?? '') };
@@ -601,24 +601,23 @@ function runAction(
         today,
       );
       const next = { ...queue, items: [...queue.items, item] };
-      return { text: `Added:\n${itemText(next, n, today)}`, queue: next, n };
+      return { text: `Added:\n${itemText(next, n, today)}`, queue: next };
     }
     case 'update': {
       assert(input.n !== undefined, 'update needs n');
       const found = queue.items.find(item => item.n === input.n);
       const target = found ?? archived.find(item => item.n === input.n);
       assert(target, `no item #${input.n}`);
-      // an archived item comes back to the queue only reopened: closed, the next write would archive it again
-      assert(
-        found || input.state === 'queued' || input.state === 'running',
-        `#${input.n} is archived; set state queued or running to bring it back`,
-      );
       const updated = patch(target, input, today);
       const items =
         found ? queue.items.map(item => (item === found ? updated : item)) : [...queue.items, updated];
       const next = { ...queue, items };
-      const verb = found ? 'Updated' : 'Restored from the archive';
-      return { text: `${verb}:\n${itemText(next, input.n, today)}`, queue: next, n: input.n };
+      // an archived item reopened comes back; still closed, the write archives it again, and its later line wins
+      const verb =
+        found ? 'Updated'
+        : isClosed(updated) ? 'Updated in the archive'
+        : 'Restored from the archive';
+      return { text: `${verb}:\n${itemText(next, input.n, today)}`, queue: next };
     }
     default:
       throw new QueueError('action must be list, get, add, update or history');
@@ -663,7 +662,10 @@ export function historyText(archived: readonly Item[], query: string): string {
       .join('\n')
       .toLowerCase();
   const found = archived
-    .filter(item => words.every(word => haystack(item).includes(word)))
+    .filter(item => {
+      const text = haystack(item);
+      return words.every(word => text.includes(word));
+    })
     .sort(newestEnded);
   if (found.length === 0) return query ? `No archived item matches "${query}".` : 'The archive is empty.';
   const lines = found
@@ -679,10 +681,12 @@ export function historyText(archived: readonly Item[], query: string): string {
  * so it is never reused.
  */
 export function prune(queue: Queue, cutoff: string): { queue: Queue; archived: Item[] } {
-  const archived = queue.items.filter(item => isClosed(item) && (item.ended ?? '') < cutoff);
+  const isOld = (item: Item) => isClosed(item) && (item.ended ?? '') < cutoff;
+  const archived = queue.items.filter(isOld);
   if (archived.length === 0) return { queue, archived };
-  const keep = queue.items.filter(item => !archived.includes(item));
-  const order = queue.order?.filter(n => keep.some(item => item.n === n));
+  const keep = queue.items.filter(item => !isOld(item));
+  const gone = new Set(archived.map(item => item.n));
+  const order = queue.order?.filter(n => !gone.has(n));
   return {
     queue: { ...queue, lastN: highestN(queue), ...(order && { order }), items: keep },
     archived,

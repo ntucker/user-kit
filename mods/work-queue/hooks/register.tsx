@@ -52,6 +52,7 @@ const USAGE = `Usage: /queue ${ARGS}`;
 const FINISH = { done: 'done', drop: 'dropped' } as const;
 
 const DEFAULT_ARCHIVE_DAYS = 14;
+const UNREADABLE = 'could not be read: ';
 
 type Options = {
   file: string;
@@ -89,10 +90,17 @@ async function today($: EngineInterface) {
 
 /** The file's mtime, or undefined while it does not exist */
 async function mtimeOf($: EngineInterface): Promise<number | undefined> {
-  // only a file that is not there counts as missing: any other error must not look like an empty queue
-  if (!(await $.fs.exists(options.file))) return undefined;
-  return (await $.fs.stat(options.file)).mtimeMs;
+  const stat = await $.fs.stat(options.file).catch(async error => {
+    // only a file that is not there counts as missing: any other error must not look like an empty queue
+    if (await $.fs.exists(options.file)) throw error;
+    return undefined;
+  });
+  return stat?.mtimeMs;
 }
+
+/** A file's text, or undefined while it does not exist */
+const readIfExists = async ($: EngineInterface, path: string) =>
+  (await $.fs.exists(path)) ? $.fs.read(path) : undefined;
 
 /** The file as a snapshot, with the text it was read from; a failed read is an error snapshot */
 async function load($: EngineInterface): Promise<{ snapshot: QueueSnapshot; text?: string }> {
@@ -103,7 +111,7 @@ async function load($: EngineInterface): Promise<{ snapshot: QueueSnapshot; text
     if (mtimeMs === undefined) return { snapshot: { kind: 'missing' } };
     text = await $.fs.read(options.file);
   } catch (error) {
-    return { snapshot: { kind: 'error', message: `could not read it: ${(error as Error).message}` } };
+    return { snapshot: { kind: 'error', message: `${UNREADABLE}${(error as Error).message}` } };
   }
   try {
     return { snapshot: { kind: 'ok', queue: parseQueue(text), mtimeMs }, text };
@@ -116,17 +124,8 @@ async function readFile($: EngineInterface): Promise<QueueSnapshot> {
   return (await load($)).snapshot;
 }
 
-/** The text on disk now, or undefined while there is no file */
-const textNow = async ($: EngineInterface) =>
-  (await $.fs.exists(options.file)) ? $.fs.read(options.file) : undefined;
-
-type Archive = ReturnType<typeof parseArchive>;
-
-async function readArchive($: EngineInterface): Promise<Archive> {
-  return (await $.fs.exists(archivePath())) ?
-      parseArchive(await $.fs.read(archivePath()))
-    : { items: [], skipped: [] };
-}
+const readArchive = async ($: EngineInterface) =>
+  parseArchive((await readIfExists($, archivePath())) ?? '');
 
 const sameSnapshot = (a: QueueSnapshot | null, b: QueueSnapshot) =>
   a !== null &&
@@ -139,7 +138,7 @@ async function show($: EngineInterface, next: QueueSnapshot) {
   const previous = await read($, snapshotAtom);
   await update($, snapshotAtom, () => next);
   if (next.kind !== 'ok') {
-    $.ui.status(undefined);
+    $.ui.status(next.kind === 'error' ? 'queue file unreadable (/queue)' : undefined);
     syncPrPoll($, next);
     return;
   }
@@ -188,30 +187,27 @@ const WRITE_TRIES = 3;
 function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
     const day = await today($);
-    // only a change can start a missing file
-    const isRead = input.action !== 'add' && input.action !== 'update';
     for (let tries = 1; tries <= WRITE_TRIES; tries++) {
       const { snapshot: onDisk, text } = await load($);
-      if (onDisk.kind === 'error' || (onDisk.kind === 'missing' && isRead))
-        throw new QueueError(describe(onDisk));
-      let archive: Archive = { items: [], skipped: [] };
-      let queue: Queue;
-      if (onDisk.kind === 'ok') queue = onDisk.queue;
-      else {
-        // a new file still numbers past the archive
-        archive = await readArchive($);
-        queue = { version: 1, lastN: highestN({ version: 1, items: archive.items }), items: [] };
-      }
-      if (onDisk.kind === 'ok' && needsArchive(queue, input)) archive = await readArchive($);
+      if (onDisk.kind === 'error') throw new QueueError(describe(onDisk));
+      const isMissing = onDisk.kind === 'missing';
+      const empty: Queue = { version: 1, items: [] };
+      const archive =
+        isMissing || needsArchive(onDisk.queue, input) ? await readArchive($) : parseArchive('');
+      // a new file still numbers past the archive
+      const queue: Queue =
+        isMissing ? { ...empty, lastN: highestN({ ...empty, items: archive.items }) } : onDisk.queue;
       const ran = runTool(queue, input, day, archive.items);
       if (archive.skipped.length)
         ran.text += `\n(skipped unreadable archive lines: ${archive.skipped.join(', ')})`;
+      // only a change can start a missing file
+      if (isMissing && !ran.queue) throw new QueueError(describe(onDisk));
       if (!ran.queue) {
         if (!sameSnapshot(await read($, snapshotAtom), onDisk)) await show($, onDisk);
         return ran.text;
       }
       // by content: a synced folder's mtimes can be coarse or carried over
-      if ((await textNow($)) === text) {
+      if ((await readIfExists($, options.file)) === text) {
         await write($, ran.queue, day);
         return ran.text;
       }
@@ -240,16 +236,15 @@ async function write($: EngineInterface, full: Queue, day: string) {
  * writing it at the same moment could have replaced the file without them
  */
 async function addToArchive($: EngineInterface, items: readonly Item[]) {
-  let missing = items;
-  for (let tries = 1; missing.length > 0; tries++) {
-    if (tries > WRITE_TRIES) throw new QueueError('the archive kept changing while items moved to it; try again');
-    const before = (await $.fs.exists(archivePath())) ? await $.fs.read(archivePath()) : '';
+  const added = archiveLines(items);
+  for (let tries = 1; tries <= WRITE_TRIES; tries++) {
+    const before = (await readIfExists($, archivePath())) ?? '';
     // a last line cut short must not swallow the first new one
     const joined = before && !before.endsWith('\n') ? `${before}\n` : before;
-    await $.fs.write(archivePath(), joined + archiveLines(missing));
-    const lines = await $.fs.read(archivePath());
-    missing = missing.filter(item => !lines.includes(archiveLines([item])));
+    await $.fs.write(archivePath(), joined + added);
+    if ((await $.fs.read(archivePath())).includes(added)) return;
   }
+  throw new QueueError('the archive kept changing while items moved to it; try again');
 }
 
 /** Settles waits on PRs gh reports merged, or closed without merging */
@@ -344,8 +339,9 @@ export const register: Register = (on, rawOptions) => {
         isDeferred: false,
       }),
     ]);
-    poll ??= $.clock.every(POLL_MS, () => void refresh($));
-    void refresh($, true);
+    // load turns a failed read into an error snapshot; what is left to drop is a stat failing between polls
+    poll ??= $.clock.every(POLL_MS, () => void refresh($).catch(() => undefined));
+    void refresh($, true).catch(() => undefined);
     return next(e);
   });
 
@@ -451,5 +447,6 @@ export const register: Register = (on, rawOptions) => {
 function describe(snapshot: Exclude<QueueSnapshot, { kind: 'ok' }>): string {
   return snapshot.kind === 'missing' ?
       'No queue file yet. Ask Claude to add an item with the queue tool, or set the file in /config.'
+    : snapshot.message.startsWith(UNREADABLE) ? `The queue file ${snapshot.message}`
     : `The queue file is invalid: ${snapshot.message}`;
 }

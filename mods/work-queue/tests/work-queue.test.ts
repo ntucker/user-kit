@@ -401,8 +401,10 @@ describe('the plugin', () => {
     expect(await queueTool($, { action: 'get', n: 1 })).toContain('Ended: 2026-10-01: Shipped\n');
     expect((await run($, 'history ship')).text).toContain('#1 Item 1 [done 2026-10-01: Shipped]');
     expect((await queueTool($, { action: 'add', title: 'Next', brief: 'B' }))).toContain('#3 Next');
-    // an archived item comes back only reopened
-    expect(await queueTool($, { action: 'update', n: 1, note: 'x' })).toContain('set state queued or running');
+    // still closed, an edit stays in the archive; its later line wins
+    expect(await queueTool($, { action: 'update', n: 1, outcome: 'Shipped v2' })).toContain('Updated in the archive');
+    expect(ns(fs.read().items)).toEqual([2, 3]);
+    expect(await queueTool($, { action: 'get', n: 1 })).toContain('Shipped v2');
     expect(await queueTool($, { action: 'update', n: 1, state: 'queued' })).toContain('Restored from the archive');
     expect(ns(fs.read().items)).toEqual([2, 3, 1]);
   });
@@ -410,7 +412,7 @@ describe('the plugin', () => {
   test('a new queue file numbers past the archive', async ($, on) => {
     const fs = await fakeFs(on);
     capture(on);
-    // its last line was cut short: the next one still starts on a line of its own
+    // its last line has no newline: the next one still starts on a line of its own
     fs.put('work-queue.archive.jsonl', `${JSON.stringify(item(6, { state: 'done' }))}\n${JSON.stringify(item(7, { state: 'done' }))}`);
     expect(await queueTool($, { action: 'add', title: 'Fresh', brief: 'B' })).toContain('#8 Fresh');
     await queueTool($, { action: 'add', title: 'Old', brief: 'B' });
