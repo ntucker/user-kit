@@ -70,6 +70,8 @@ Use this instead of the GitHub marketplace on the authoring machine, not alongsi
   - `claude/workflows/` — a mirror of `workflows/`
 - `workflows/<name>.js` — Claude Code Workflow scripts, run as `user-kit:<name>` (Cursor ignores them)
 - `mods/<name>/` — Claude Code mods, each its own plugin in the Claude marketplace (install `<name>@user-kit`; Cursor ignores them)
+  - Mods run only in Claude Code sessions: the terminal, the desktop app's Code tab, IDE extensions and Cowork. In a claude.ai project, threads load them once the plugin is enabled on the account, but the project chat (the coordinator) is not a Claude Code session and never loads them.
+  - A cloud session reads mod options from `~/.claude/settings.json` (`pluginConfigs`), so set them in the environment's setup script.
 - `.cursor-plugin/` — Cursor manifest and marketplace
 - `.claude-plugin/` — Claude Code marketplace
 
