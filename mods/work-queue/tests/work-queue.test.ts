@@ -170,7 +170,10 @@ describe('queue tool logic', () => {
     const reopened = runTool(QUEUE, { action: 'update', n: 9, state: 'queued' }, TODAY, []);
     const nine = reopened.queue?.items.find(one => one.n === 9);
     expect(nine?.ended).toBeUndefined();
-    expect(nine?.outcome).toBeUndefined();    // done to dropped keeps the day it ended
+    expect(nine?.outcome).toBeUndefined();
+  });
+
+  test('moving between done and dropped keeps the day it ended', async () => {
     const dropped = runTool(QUEUE, { action: 'update', n: 9, state: 'dropped' }, TODAY, []);
     expect(dropped.queue?.items.find(one => one.n === 9)?.ended).toBe('2026-11-01');
   });
@@ -407,6 +410,8 @@ describe('the plugin', () => {
     expect(await queueTool($, { action: 'update', n: 1, outcome: 'Shipped v2' })).toContain('Updated an archived item');
     expect(ns(fs.read().items)).toEqual([2, 3]);
     expect(await queueTool($, { action: 'get', n: 1 })).toContain('Shipped v2');
+    expect(await queueTool($, { action: 'update', n: 1, state: 'dropped' })).toContain('Ended: 2026-10-01');
+    expect(ns(fs.read().items)).toEqual([2, 3]);
     expect(await queueTool($, { action: 'update', n: 1, state: 'queued' })).toContain('Restored from the archive');
     expect(ns(fs.read().items)).toEqual([2, 3, 1]);
   });
