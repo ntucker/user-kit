@@ -1,0 +1,32 @@
+{
+  "name": "work-queue",
+  "version": "0.1.0",
+  "description": "A shared work queue in one JSON file: a pane grouped by what each item waits on (your call, PRs, other items, events), a status line count, /queue commands, and a queue tool Claude uses to add, start and finish items",
+  "author": {
+    "name": "Nathaniel Tucker",
+    "email": "me@ntucker.me"
+  },
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "repository": "https://github.com/ntucker/user-kit",
+  "userConfig": {
+    "file": {
+      "type": "string",
+      "title": "Queue file",
+      "description": "The queue's JSON file, absolute or relative to the working directory",
+      "default": "work-queue.json"
+    },
+    "markdown": {
+      "type": "string",
+      "title": "Markdown copy",
+      "description": "Where to write a readable Markdown copy after each change; empty for none",
+      "default": ""
+    },
+    "checkPrs": {
+      "type": "boolean",
+      "title": "Check PRs with gh",
+      "description": "Clear a 'waits on PR' once gh reports the PR merged",
+      "default": true
+    }
+  }
+}
