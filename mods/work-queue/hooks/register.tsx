@@ -52,7 +52,6 @@ const USAGE = `Usage: /queue ${ARGS}`;
 const FINISH = { done: 'done', drop: 'dropped' } as const;
 
 const DEFAULT_ARCHIVE_DAYS = 14;
-const UNREADABLE = 'could not be read: ';
 
 type Options = {
   file: string;
@@ -111,12 +110,12 @@ async function load($: EngineInterface): Promise<{ snapshot: QueueSnapshot; text
     if (mtimeMs === undefined) return { snapshot: { kind: 'missing' } };
     text = await $.fs.read(options.file);
   } catch (error) {
-    return { snapshot: { kind: 'error', message: `${UNREADABLE}${(error as Error).message}` } };
+    return { snapshot: { kind: 'error', reason: 'unreadable', message: (error as Error).message } };
   }
   try {
     return { snapshot: { kind: 'ok', queue: parseQueue(text), mtimeMs }, text };
   } catch (error) {
-    return { snapshot: { kind: 'error', message: (error as Error).message }, text };
+    return { snapshot: { kind: 'error', reason: 'invalid', message: (error as Error).message }, text };
   }
 }
 
@@ -138,7 +137,7 @@ async function show($: EngineInterface, next: QueueSnapshot) {
   const previous = await read($, snapshotAtom);
   await update($, snapshotAtom, () => next);
   if (next.kind !== 'ok') {
-    $.ui.status(next.kind === 'error' ? 'queue file unreadable (/queue)' : undefined);
+    $.ui.status(next.kind === 'error' ? `queue file ${next.reason} (/queue)` : undefined);
     syncPrPoll($, next);
     return;
   }
@@ -157,7 +156,9 @@ async function show($: EngineInterface, next: QueueSnapshot) {
 function refresh($: EngineInterface, force = false): Promise<QueueSnapshot> {
   return serial(async () => {
     const current = await read($, snapshotAtom);
-    if (!force && current?.kind === 'ok' && (await mtimeOf($)) === current.mtimeMs) {
+    // a failed stat falls through to load, which shows it as an error
+    const mtimeMs = await mtimeOf($).catch(() => undefined);
+    if (!force && current?.kind === 'ok' && mtimeMs === current.mtimeMs) {
       if ((await today($)) !== shownDay) await show($, current);
       return current;
     }
@@ -193,7 +194,7 @@ function apply($: EngineInterface, input: ToolInput): Promise<string> {
       const isMissing = onDisk.kind === 'missing';
       const empty: Queue = { version: 1, items: [] };
       const archive =
-        isMissing || needsArchive(onDisk.queue, input) ? await readArchive($) : parseArchive('');
+        isMissing || needsArchive(onDisk.queue, input) ? await readArchive($) : { items: [], skipped: [] };
       // a new file still numbers past the archive
       const queue: Queue =
         isMissing ? { ...empty, lastN: highestN({ ...empty, items: archive.items }) } : onDisk.queue;
@@ -339,7 +340,7 @@ export const register: Register = (on, rawOptions) => {
         isDeferred: false,
       }),
     ]);
-    // load turns a failed read into an error snapshot; what is left to drop is a stat failing between polls
+    // refresh shows a file it cannot read as an error; these catches only drop a failed redraw
     poll ??= $.clock.every(POLL_MS, () => void refresh($).catch(() => undefined));
     void refresh($, true).catch(() => undefined);
     return next(e);
@@ -447,6 +448,6 @@ export const register: Register = (on, rawOptions) => {
 function describe(snapshot: Exclude<QueueSnapshot, { kind: 'ok' }>): string {
   return snapshot.kind === 'missing' ?
       'No queue file yet. Ask Claude to add an item with the queue tool, or set the file in /config.'
-    : snapshot.message.startsWith(UNREADABLE) ? `The queue file ${snapshot.message}`
+    : snapshot.reason === 'unreadable' ? `The queue file could not be read: ${snapshot.message}`
     : `The queue file is invalid: ${snapshot.message}`;
 }

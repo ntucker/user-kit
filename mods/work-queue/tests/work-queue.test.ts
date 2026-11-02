@@ -170,7 +170,9 @@ describe('queue tool logic', () => {
     const reopened = runTool(QUEUE, { action: 'update', n: 9, state: 'queued' }, TODAY, []);
     const nine = reopened.queue?.items.find(one => one.n === 9);
     expect(nine?.ended).toBeUndefined();
-    expect(nine?.outcome).toBeUndefined();
+    expect(nine?.outcome).toBeUndefined();    // done to dropped keeps the day it ended
+    const dropped = runTool(QUEUE, { action: 'update', n: 9, state: 'dropped' }, TODAY, []);
+    expect(dropped.queue?.items.find(one => one.n === 9)?.ended).toBe('2026-11-01');
   });
 
   test('a PR closed without merging becomes a question, on queued items only', async () => {
@@ -402,7 +404,7 @@ describe('the plugin', () => {
     expect((await run($, 'history ship')).text).toContain('#1 Item 1 [done 2026-10-01: Shipped]');
     expect((await queueTool($, { action: 'add', title: 'Next', brief: 'B' }))).toContain('#3 Next');
     // still closed, an edit stays in the archive; its later line wins
-    expect(await queueTool($, { action: 'update', n: 1, outcome: 'Shipped v2' })).toContain('Updated in the archive');
+    expect(await queueTool($, { action: 'update', n: 1, outcome: 'Shipped v2' })).toContain('Updated an archived item');
     expect(ns(fs.read().items)).toEqual([2, 3]);
     expect(await queueTool($, { action: 'get', n: 1 })).toContain('Shipped v2');
     expect(await queueTool($, { action: 'update', n: 1, state: 'queued' })).toContain('Restored from the archive');

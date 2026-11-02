@@ -65,7 +65,8 @@ export type Tab = 'open' | 'running' | 'done';
 export type QueueSnapshot =
   | { kind: 'ok'; queue: Queue; mtimeMs: number }
   | { kind: 'missing' }
-  | { kind: 'error'; message: string };
+  /** unreadable: the file could not be read; invalid: it was read but is not a valid queue */
+  | { kind: 'error'; reason: 'unreadable' | 'invalid'; message: string };
 
 /** What the `queue` tool takes */
 export type ToolInput = {

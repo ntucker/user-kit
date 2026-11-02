@@ -558,7 +558,8 @@ export function runTool(
     checkQueue(ran.queue);
     for (const n of newItemWaits(queue, input))
       assert(archived.some(item => item.n === n), `no item #${n} in the queue or its archive`);
-    if (input.addWaits?.length) checkNoCycle(ran.queue, input.n ?? highestN(ran.queue));
+    // nothing waits on a new item yet, so only an update can close a loop
+    if (input.action === 'update' && input.addWaits?.length) checkNoCycle(ran.queue, input.n!);
   }
   return ran;
 }
@@ -588,6 +589,7 @@ function runAction(
     case 'get': {
       assert(input.n !== undefined, 'get needs n');
       const old = queue.items.some(item => item.n === input.n) ? undefined : archived.find(item => item.n === input.n);
+      // an archived item's waits are long settled, so it is shown without looking up the items it names
       return { text: old ? [...itemLines(old, new Map(), today), '(archived)'].join('\n') : itemText(queue, input.n, today) };
     }
     case 'history':
@@ -612,10 +614,10 @@ function runAction(
       const items =
         found ? queue.items.map(item => (item === found ? updated : item)) : [...queue.items, updated];
       const next = { ...queue, items };
-      // an archived item reopened comes back; still closed, the write archives it again, and its later line wins
+      // an archived item comes back to the queue; still closed, it is archived again under the usual rule, and its later line wins
       const verb =
         found ? 'Updated'
-        : isClosed(updated) ? 'Updated in the archive'
+        : isClosed(updated) ? 'Updated an archived item'
         : 'Restored from the archive';
       return { text: `${verb}:\n${itemText(next, input.n, today)}`, queue: next };
     }
@@ -631,7 +633,8 @@ function patch(item: Item, input: ToolInput, today: string): Item {
   if (input.state !== undefined && input.state !== item.state) {
     next.state = input.state;
     if (input.state === 'running') next.started ??= today;
-    if (input.state === 'done' || input.state === 'dropped') next.ended = today;
+    // from one ended state to the other, it keeps the day it ended
+    if (isClosed(next)) next.ended = isClosed(item) ? item.ended ?? today : today;
     else {
       // reopened: its old end no longer applies
       delete next.ended;
@@ -685,8 +688,8 @@ export function prune(queue: Queue, cutoff: string): { queue: Queue; archived: I
   const archived = queue.items.filter(isOld);
   if (archived.length === 0) return { queue, archived };
   const keep = queue.items.filter(item => !isOld(item));
-  const gone = new Set(archived.map(item => item.n));
-  const order = queue.order?.filter(n => !gone.has(n));
+  const kept = new Set(keep.map(item => item.n));
+  const order = queue.order?.filter(n => kept.has(n));
   return {
     queue: { ...queue, lastN: highestN(queue), ...(order && { order }), items: keep },
     archived,
