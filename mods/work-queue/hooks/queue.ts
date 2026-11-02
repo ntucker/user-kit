@@ -57,13 +57,14 @@ export function openWaits(
   });
 }
 
-/** Precedence: anything waiting on the person shows there first */
-const WAIT_GROUP: Record<Wait['kind'], Group> = {
-  decision: 'decision',
-  pr: 'pr',
-  item: 'item',
-  event: 'event',
-};
+/** Which wait an item shows under: anything waiting on the person first */
+const WAIT_PRECEDENCE: readonly Wait['kind'][] = ['decision', 'pr', 'item', 'event'];
+
+/** Every group, in the order lists show them */
+export const ALL_GROUPS: readonly Group[] = [...OPEN_GROUPS, 'running', 'done'];
+
+export const byNumber = (queue: Queue): ReadonlyMap<number, Item> =>
+  new Map(queue.items.map(item => [item.n, item]));
 
 export function groupOf(
   item: Item,
@@ -73,20 +74,15 @@ export function groupOf(
   if (item.state === 'running') return 'running';
   if (isClosed(item)) return 'done';
   const kinds = new Set(openWaits(item, byN, today).map(wait => wait.kind));
-  for (const group of OPEN_GROUPS)
-    if (group !== 'ready' && kinds.has(group as Wait['kind']))
-      return WAIT_GROUP[group as Wait['kind']];
-  return 'ready';
+  return WAIT_PRECEDENCE.find(kind => kinds.has(kind)) ?? 'ready';
 }
 
 const RANK: Record<Priority, number> = { high: 0, normal: 1, low: 2 };
 
 /** `order` first, then priority, then oldest first */
 function compare(order: readonly number[]) {
-  const at = (n: number) => {
-    const i = order.indexOf(n);
-    return i === -1 ? Infinity : i;
-  };
+  const index = new Map(order.map((n, i) => [n, i]));
+  const at = (n: number) => index.get(n) ?? Infinity;
   return (a: Item, b: Item) =>
     at(a.n) - at(b.n) ||
     RANK[a.priority ?? 'normal'] - RANK[b.priority ?? 'normal'] ||
@@ -95,8 +91,11 @@ function compare(order: readonly number[]) {
 
 export type Grouped = Record<Group, Item[]>;
 
-export function groupItems(queue: Queue, today: string): Grouped {
-  const byN = new Map(queue.items.map(item => [item.n, item]));
+export function groupItems(
+  queue: Queue,
+  today: string,
+  byN = byNumber(queue),
+): Grouped {
   const grouped: Grouped = {
     decision: [],
     ready: [],
@@ -109,7 +108,7 @@ export function groupItems(queue: Queue, today: string): Grouped {
   for (const item of queue.items)
     grouped[groupOf(item, byN, today)].push(item);
   const sort = compare(queue.order ?? []);
-  for (const list of Object.values(grouped)) list.sort(sort);
+  for (const group of ALL_GROUPS) if (group !== 'done') grouped[group].sort(sort);
   // newest first
   grouped.done.sort((a, b) =>
     (b.ended ?? '').localeCompare(a.ended ?? '') || b.n - a.n,
@@ -133,33 +132,36 @@ export function waitLabel(wait: Wait): string {
   }
 }
 
-/** The chip a row shows: its open waits, or its priority when ready */
-export function rowLabel(item: Item, byN: ReadonlyMap<number, Item>, today: string) {
-  const open = openWaits(item, byN, today);
-  if (item.state === 'running') return item.prs?.map(short).join(' ') ?? '';
-  if (isClosed(item)) return item.ended ?? item.state;
-  if (open.length === 0) return item.priority === 'low' ? 'low' : '';
-  const group = groupOf(item, byN, today);
-  return open
-    .filter(wait => WAIT_GROUP[wait.kind] === group)
-    .map(waitLabel)
-    .join(' · ');
-}
-
-export function counts(grouped: Grouped) {
-  return Object.fromEntries(
-    Object.entries(grouped).map(([group, items]) => [group, items.length]),
-  ) as Record<Group, number>;
+/** The chip a row in `group` shows: the waits that put it there, its PRs, or its end */
+export function rowLabel(
+  item: Item,
+  group: Group,
+  byN: ReadonlyMap<number, Item>,
+  today: string,
+): string {
+  switch (group) {
+    case 'running':
+      return item.prs?.map(short).join(' ') ?? '';
+    case 'done':
+      return item.ended ?? item.state;
+    case 'ready':
+      return item.priority === 'low' ? 'low' : '';
+    default:
+      return openWaits(item, byN, today)
+        .filter(wait => wait.kind === group)
+        .map(waitLabel)
+        .join(' · ');
+  }
 }
 
 /** `queue 3 ready · 6 need you · 4 wait on PRs · 5 running`, zeros left out */
 export function statusText(grouped: Grouped): string {
-  const c = counts(grouped);
+  const { ready, decision, pr, running } = grouped;
   const parts = [
-    c.ready && `${c.ready} ready`,
-    c.decision && `${c.decision} need you`,
-    c.pr && `${c.pr} wait on PRs`,
-    c.running && `${c.running} running`,
+    ready.length && `${ready.length} ready`,
+    decision.length && `${decision.length} need you`,
+    pr.length && `${pr.length} wait on PRs`,
+    running.length && `${running.length} running`,
   ].filter(Boolean);
   return `queue ${parts.length ? parts.join(' · ') : 'empty'}`;
 }
@@ -170,20 +172,15 @@ export function summaryText(
   today: string,
   { withDone = false } = {},
 ): string {
-  const grouped = groupItems(queue, today);
-  const byN = new Map(queue.items.map(item => [item.n, item]));
-  const groups: Group[] = [
-    ...OPEN_GROUPS,
-    'running',
-    ...(withDone ? (['done'] as const) : []),
-  ];
+  const byN = byNumber(queue);
+  const grouped = groupItems(queue, today, byN);
   const lines = [statusText(grouped)];
-  for (const group of groups) {
+  for (const group of ALL_GROUPS) {
     const items = grouped[group];
-    if (items.length === 0) continue;
+    if (items.length === 0 || (group === 'done' && !withDone)) continue;
     lines.push('', `${GROUP_TITLE[group]} (${items.length})`);
     for (const item of items) {
-      const label = rowLabel(item, byN, today);
+      const label = rowLabel(item, group, byN, today);
       lines.push(`  #${item.n} ${item.title}${label ? ` [${label}]` : ''}`);
     }
   }
@@ -192,9 +189,16 @@ export function summaryText(
 
 /** One item in full */
 export function itemText(queue: Queue, n: number, today: string): string {
-  const item = queue.items.find(one => one.n === n);
-  if (!item) return `No item #${n}.`;
-  const byN = new Map(queue.items.map(one => [one.n, one]));
+  const byN = byNumber(queue);
+  const item = byN.get(n);
+  return item ? itemLines(item, byN, today).join('\n') : `No item #${n}.`;
+}
+
+function itemLines(
+  item: Item,
+  byN: ReadonlyMap<number, Item>,
+  today: string,
+): string[] {
   const open = openWaits(item, byN, today);
   const lines = [
     `#${item.n} ${item.title}`,
@@ -225,12 +229,13 @@ export function itemText(queue: Queue, n: number, today: string): string {
     lines.push('', 'Notes:');
     for (const note of item.notes) lines.push(`  ${note.date}: ${note.text}`);
   }
-  return lines.join('\n');
+  return lines;
 }
 
 /** A readable copy of the whole queue, for anyone without the plugin */
 export function toMarkdown(queue: Queue, today: string): string {
-  const grouped = groupItems(queue, today);
+  const byN = byNumber(queue);
+  const grouped = groupItems(queue, today, byN);
   const lines = [
     '# Work queue',
     '',
@@ -239,12 +244,12 @@ export function toMarkdown(queue: Queue, today: string): string {
     statusText(grouped),
   ];
   if (queue.rules) lines.push('', queue.rules);
-  for (const group of [...OPEN_GROUPS, 'running', 'done'] as const) {
+  for (const group of ALL_GROUPS) {
     const items = grouped[group];
     if (items.length === 0) continue;
     lines.push('', `## ${GROUP_TITLE[group]}`);
     for (const item of items) {
-      const [, ...body] = itemText(queue, item.n, today).split('\n');
+      const [, ...body] = itemLines(item, byN, today);
       lines.push('', `### ${item.n}. ${item.title}`, '', ...body);
     }
   }
@@ -324,7 +329,7 @@ export function parseQueue(text: string): Queue {
 
 export const serialize = (queue: Queue) => `${JSON.stringify(queue, null, 2)}\n`;
 
-/** Open PR waits across the queue */
+/** Open PR waits across queued items */
 export function openPrs(queue: Queue): string[] {
   const prs = new Set<string>();
   for (const item of queue.items)
@@ -351,10 +356,13 @@ export function markMerged(queue: Queue, merged: ReadonlySet<string>): Queue {
   return changed ? { ...queue, items } : queue;
 }
 
-/** Items that were not ready before and are now: worth a toast */
-export function newlyReady(before: Queue, after: Queue, today: string): Item[] {
-  const was = new Set(groupItems(before, today).ready.map(item => item.n));
-  return groupItems(after, today).ready.filter(item => !was.has(item.n));
+/** Items of `ready` (the new queue's) that were not ready in `before` */
+export function newlyReady(before: Queue, ready: readonly Item[], today: string): Item[] {
+  const byN = byNumber(before);
+  return ready.filter(item => {
+    const was = byN.get(item.n);
+    return !was || groupOf(was, byN, today) !== 'ready';
+  });
 }
 
 export const TOOL_SCHEMA = {
@@ -381,12 +389,11 @@ export const TOOL_SCHEMA = {
     priority: { enum: PRIORITIES },
     repo: { type: 'string' },
     source: { type: 'string', description: 'Where the item came from' },
-    waits: {
+    addWaits: {
       type: 'array',
-      description: 'Replaces every wait. Prefer addWaits/clearWaits.',
       items: { $ref: '#/$defs/wait' },
+      description: 'What the item waits on before it can start',
     },
-    addWaits: { type: 'array', items: { $ref: '#/$defs/wait' } },
     clearWaits: {
       type: 'array',
       items: { type: 'integer' },
@@ -470,13 +477,11 @@ function patch(item: Item, input: ToolInput, today: string): Item {
   for (const key of ['title', 'brief', 'priority', 'repo', 'source', 'thread', 'outcome'] as const)
     if (input[key] !== undefined) (next as Record<string, unknown>)[key] = input[key];
   if (input.state !== undefined && input.state !== item.state) {
-    assert(STATES.includes(input.state), `state must be ${STATES.join(', ')}`);
     next.state = input.state;
     if (input.state === 'running') next.started ??= today;
     if (input.state === 'done' || input.state === 'dropped') next.ended = today;
     if (input.state === 'queued') delete next.ended;
   }
-  if (input.waits) next.waits = [...input.waits];
   if (input.clearWaits?.length) {
     const drop = new Set(input.clearWaits);
     next.waits = next.waits.filter((_, i) => !drop.has(i));

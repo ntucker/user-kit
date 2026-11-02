@@ -139,8 +139,10 @@ describe('queue tool logic', () => {
 });
 
 /** An in-memory file system; `files` and `mtime` are the host's */
-function fakeFs(on: On, initial?: Queue) {
+async function fakeFs(on: On, initial?: Queue) {
   const clock = mock.clock(on);
+  // midday on TODAY
+  await clock.set(Date.parse(`${TODAY}T12:00:00Z`));
   const name = (path: string) => path.split('/').pop()!;
   const files = new Map<string, string>();
   const mtime = new Map<string, number>();
@@ -234,13 +236,13 @@ const PANE = {
 
 describe('the plugin', () => {
   test('the tool adds to a missing file and writes it', async ($, on) => {
-    const fs = fakeFs(on);
+    const fs = await fakeFs(on);
     capture(on);
     const text = await queueTool($, {
       action: 'add',
       title: 'First',
       brief: 'Start here',
-      waits: [{ kind: 'decision', ask: 'Go?' }],
+      addWaits: [{ kind: 'decision', ask: 'Go?' }],
     });
     expect(text).toContain('#1 First');
     expect(fs.read().items).toEqual([
@@ -249,7 +251,7 @@ describe('the plugin', () => {
   });
 
   test('writes a markdown copy when configured', { options: { markdown: 'queue.md' } }, async ($, on) => {
-    const fs = fakeFs(on, QUEUE);
+    const fs = await fakeFs(on, QUEUE);
     capture(on);
     await queueTool($, { action: 'update', n: 2, clearWaits: [0] });
     expect(fs.files.get('queue.md')).toContain('# Work queue');
@@ -257,7 +259,7 @@ describe('the plugin', () => {
   });
 
   test('keeps edits made by others since the last read', async ($, on) => {
-    const fs = fakeFs(on, QUEUE);
+    const fs = await fakeFs(on, QUEUE);
     capture(on);
     await queueTool($, { action: 'list' });
     // another session adds an item
@@ -269,7 +271,7 @@ describe('the plugin', () => {
   });
 
   test('a bad call answers with the reason and leaves the file alone', async ($, on) => {
-    const fs = fakeFs(on, QUEUE);
+    const fs = await fakeFs(on, QUEUE);
     capture(on);
     const before = fs.files.get(FILE);
     expect(await queueTool($, { action: 'update', n: 99 })).toBe('Error: no item #99');
@@ -277,14 +279,14 @@ describe('the plugin', () => {
   });
 
   test('says when the file is invalid', async ($, on) => {
-    const fs = fakeFs(on);
+    const fs = await fakeFs(on);
     fs.put(FILE, '{ nope');
     capture(on);
     expect(await queueTool($, { action: 'list' })).toContain('The queue file is invalid: not JSON');
   });
 
   test('/queue shows the summary; done and drop finish items', async ($, on) => {
-    const fs = fakeFs(on, QUEUE);
+    const fs = await fakeFs(on, QUEUE);
     capture(on);
     expect((await run($, '')).text).toContain('Ready (4)');
     expect((await run($, '4')).text).toContain('#4 Item 4');
@@ -295,7 +297,7 @@ describe('the plugin', () => {
   });
 
   test('/queue start asks Claude to start the item', async ($, on) => {
-    const { clock } = fakeFs(on, QUEUE);
+    const { clock } = await fakeFs(on, QUEUE);
     const { prompts } = capture(on);
     expect((await run($, 'start 3')).text).toBe('Starting #3.');
     await clock.advance(1);
@@ -305,7 +307,7 @@ describe('the plugin', () => {
   });
 
   test('clears merged PR waits and toasts what became ready', async ($, on) => {
-    const fs = fakeFs(on, QUEUE);
+    const fs = await fakeFs(on, QUEUE);
     const { clock } = fs;
     const merged = new Set<string>();
     const gh = fakeGh(on, merged);
@@ -322,7 +324,7 @@ describe('the plugin', () => {
   });
 
   test('the pane groups items and opens one', async ($, on) => {
-    const { clock } = fakeFs(on, QUEUE);
+    const { clock } = await fakeFs(on, QUEUE);
     const { prompts } = capture(on);
     await queueTool($, { action: 'list' });
     for (const surface of ['terminal', 'desktop', 'mobile'] as const) {

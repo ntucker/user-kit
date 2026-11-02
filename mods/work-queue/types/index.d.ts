@@ -76,8 +76,6 @@ export type ToolInput = {
   priority?: Priority;
   repo?: string;
   source?: string;
-  /** Replaces every wait */
-  waits?: Wait[];
   /** Adds waits */
   addWaits?: Wait[];
   /** Removes waits by their index in `get`'s list */

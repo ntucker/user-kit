@@ -1,10 +1,13 @@
+import { atom, read, update } from 'claude-code';
 import type { EngineInterface, Register, Timer } from 'claude-code';
 
 import type { Group, Item, Queue, QueueSnapshot, Tab, ToolInput } from '../types';
 import {
+  ALL_GROUPS,
   GROUP_TITLE,
   OPEN_GROUPS,
   QueueError,
+  byNumber,
   groupItems,
   isoDay,
   itemText,
@@ -24,9 +27,9 @@ import {
 const PANE = 'work-queue';
 const TITLE = 'Work queue';
 const TOOL = 'mcp__work-queue__queue';
-const snapshotRef = { plugin: 'work-queue', key: 'snapshot' } as const;
-const tabRef = { plugin: 'work-queue', key: 'tab' } as const;
-const selectedRef = { plugin: 'work-queue', key: 'selected' } as const;
+const snapshotAtom = atom({ plugin: 'work-queue', key: 'snapshot' } as const, null);
+const tabAtom = atom({ plugin: 'work-queue', key: 'tab' } as const, 'open');
+const selectedAtom = atom({ plugin: 'work-queue', key: 'selected' } as const, null);
 /** A stat of the file: cheap, so others' edits show within this */
 const POLL_MS = 20_000;
 const PR_POLL_MS = 5 * 60_000;
@@ -38,7 +41,9 @@ const GROUP_COLOR: Partial<Record<Group, string>> = {
   running: 'claude',
 };
 
-const today = () => isoDay(new Date());
+const USAGE =
+  'Usage: /queue [all | <n> | start <n> | done <n> [outcome] | drop <n> [reason]]';
+const FINISH = { done: 'done', drop: 'dropped' } as const;
 
 type Options = { file: string; markdown: string; checkPrs: boolean };
 
@@ -53,12 +58,21 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
   return run;
 }
 
+async function today($: EngineInterface) {
+  return isoDay(new Date(await $.clock.now()));
+}
+
+/** The file's mtime, or undefined while it does not exist */
+async function mtimeOf($: EngineInterface): Promise<number | undefined> {
+  const stat = await $.fs.stat(options.file).catch(() => undefined);
+  return stat?.mtimeMs;
+}
+
 async function readFile($: EngineInterface): Promise<QueueSnapshot> {
-  if (!(await $.fs.exists(options.file))) return { kind: 'missing' };
-  const stat = await $.fs.stat(options.file);
+  const mtimeMs = await mtimeOf($);
+  if (mtimeMs === undefined) return { kind: 'missing' };
   try {
-    const queue = parseQueue(await $.fs.read(options.file));
-    return { kind: 'ok', queue, mtimeMs: stat.mtimeMs };
+    return { kind: 'ok', queue: parseQueue(await $.fs.read(options.file)), mtimeMs };
   } catch (error) {
     return { kind: 'error', message: (error as Error).message };
   }
@@ -66,13 +80,18 @@ async function readFile($: EngineInterface): Promise<QueueSnapshot> {
 
 /** Shows a new snapshot: state, status line, toasts for newly ready items */
 async function show($: EngineInterface, next: QueueSnapshot) {
-  const previous = (await $.state.get(snapshotRef)).value ?? null;
-  await $.state.set(snapshotRef, next);
-  $.ui.status(
-    next.kind === 'ok' ? statusText(groupItems(next.queue, today())) : undefined,
-  );
-  if (previous?.kind === 'ok' && next.kind === 'ok')
-    for (const item of newlyReady(previous.queue, next.queue, today()))
+  const previous = await read($, snapshotAtom);
+  await update($, snapshotAtom, () => next);
+  if (next.kind !== 'ok') {
+    $.ui.status(undefined);
+    syncPrPoll($, next);
+    return;
+  }
+  const day = await today($);
+  const grouped = groupItems(next.queue, day);
+  $.ui.status(statusText(grouped));
+  if (previous?.kind === 'ok')
+    for (const item of newlyReady(previous.queue, grouped.ready, day))
       $.ui.toast(`Queue #${item.n} is ready: ${item.title}`);
   syncPrPoll($, next);
 }
@@ -80,48 +99,65 @@ async function show($: EngineInterface, next: QueueSnapshot) {
 /** Re-reads the file when it changed since the last read */
 function refresh($: EngineInterface, force = false): Promise<QueueSnapshot> {
   return serial(async () => {
-    const current = (await $.state.get(snapshotRef)).value ?? null;
-    if (!force && current?.kind === 'ok') {
-      const stat = (await $.fs.exists(options.file)) ? await $.fs.stat(options.file) : undefined;
-      if (stat?.mtimeMs === current.mtimeMs) return current;
-    }
+    const current = await read($, snapshotAtom);
+    if (!force && current?.kind === 'ok' && (await mtimeOf($)) === current.mtimeMs)
+      return current;
     const next = await readFile($);
     await show($, next);
     return next;
   });
 }
 
-/** Applies a change to the file as it is now, so others' edits survive */
-function mutate($: EngineInterface, change: (queue: Queue) => Queue): Promise<Queue> {
+/** The queue as it is now, or a QueueError saying why there is none */
+async function currentQueue($: EngineInterface): Promise<Queue> {
+  const snapshot = await refresh($);
+  if (snapshot.kind !== 'ok') throw new QueueError(describe(snapshot));
+  return snapshot.queue;
+}
+
+/**
+ * Runs a tool input against the file as it is now, so others' edits survive,
+ * and writes it back when it changed. Throws QueueError for a bad input.
+ */
+function apply($: EngineInterface, input: ToolInput): Promise<string> {
   return serial(async () => {
+    const day = await today($);
     const read = await readFile($);
-    if (read.kind === 'error') throw new QueueError(read.message);
-    const queue: Queue =
-      read.kind === 'ok' ? read.queue : { version: 1, items: [] };
-    const next = change(queue);
-    if (next === queue && read.kind === 'ok') return queue;
-    await $.fs.write(options.file, serialize(next));
-    if (options.markdown)
-      await $.fs.write(options.markdown, toMarkdown(next, today()));
-    const stat = await $.fs.stat(options.file);
-    await show($, { kind: 'ok', queue: next, mtimeMs: stat.mtimeMs });
-    return next;
+    if (read.kind === 'error') throw new QueueError(describe(read));
+    const queue: Queue = read.kind === 'ok' ? read.queue : { version: 1, items: [] };
+    const ran = runTool(queue, input, day);
+    if (ran.queue) await write($, ran.queue, day);
+    return ran.text;
   });
+}
+
+async function write($: EngineInterface, queue: Queue, day: string) {
+  await $.fs.write(options.file, serialize(queue));
+  if (options.markdown) await $.fs.write(options.markdown, toMarkdown(queue, day));
+  await show($, { kind: 'ok', queue, mtimeMs: (await mtimeOf($)) ?? 0 });
 }
 
 /** Clears waits on PRs gh reports merged */
 async function checkPrs($: EngineInterface) {
-  const snapshot = (await $.state.get(snapshotRef)).value;
+  const snapshot = await read($, snapshotAtom);
   if (snapshot?.kind !== 'ok') return;
-  const merged = new Set<string>();
-  for (const pr of openPrs(snapshot.queue)) {
-    const [repo = '', number = ''] = pr.split('#');
-    const ran = await $.process.run([
-      'gh', 'pr', 'view', number, '-R', repo, '--json', 'state', '-q', '.state',
-    ]);
-    if (ran.exitCode === 0 && ran.stdout.trim() === 'MERGED') merged.add(pr);
-  }
-  if (merged.size) await mutate($, queue => markMerged(queue, merged));
+  const states = await Promise.all(
+    openPrs(snapshot.queue).map(async pr => {
+      const [repo = '', number = ''] = pr.split('#');
+      const ran = await $.process.run([
+        'gh', 'pr', 'view', number, '-R', repo, '--json', 'state', '-q', '.state',
+      ]);
+      return ran.exitCode === 0 && ran.stdout.trim() === 'MERGED' ? pr : undefined;
+    }),
+  );
+  const merged = new Set(states.filter(pr => pr !== undefined));
+  if (merged.size === 0) return;
+  await serial(async () => {
+    const read = await readFile($);
+    if (read.kind !== 'ok') return;
+    const next = markMerged(read.queue, merged);
+    if (next !== read.queue) await write($, next, await today($));
+  });
 }
 
 function syncPrPoll($: EngineInterface, snapshot: QueueSnapshot) {
@@ -134,44 +170,38 @@ function syncPrPoll($: EngineInterface, snapshot: QueueSnapshot) {
   }
 }
 
+/** Asks Claude to start item n */
 async function startItem($: EngineInterface, n: number): Promise<string> {
-  const snapshot = await refresh($);
-  if (snapshot.kind !== 'ok') return 'The queue file could not be read.';
-  const item = snapshot.queue.items.find(one => one.n === n);
-  if (!item) return `No item #${n}.`;
-  // a command.run hook holds the turn a submit would wait on, so submit after it
-  $.clock.after(0, () => void $.prompt.submit({
-    text: `Start work-queue item #${n}. When the work begins, mark it running with the queue tool (set thread to where it runs); when it ends, mark it done with an outcome, adding any follow-ups as new items.\n\n${itemText(snapshot.queue, n, today())}`,
-  }));
+  const text = itemText(await currentQueue($), n, await today($));
+  if (text.startsWith('No item')) return text;
+  // /queue's command.run hook holds the turn a submit would wait on, so submit after it
+  $.clock.after(0, () =>
+    void $.prompt
+      .submit({
+        text: `Start work-queue item #${n}. When the work begins, mark it running with the queue tool (set thread to where it runs); when it ends, mark it done with an outcome, adding any follow-ups as new items.\n\n${text}`,
+      })
+      .catch(error => $.ui.toast(`Could not start #${n}: ${(error as Error).message}`)),
+  );
   return `Starting #${n}.`;
 }
 
 async function command($: EngineInterface, args: string): Promise<string> {
-  const [verb = '', ...rest] = args.trim().split(/\s+/).filter(Boolean);
-  const n = Number(rest[0] ?? verb);
-  const text = rest.slice(1).join(' ');
+  const [verb = '', arg = '', ...rest] = args.trim().split(/\s+/).filter(Boolean);
   if (verb === '' || verb === 'all') {
     await $.ui.open({ id: PANE, title: TITLE });
-    const snapshot = await refresh($, true);
-    return snapshot.kind === 'ok' ?
-        summaryText(snapshot.queue, today(), { withDone: verb === 'all' })
-      : describe(snapshot);
+    const queue = await currentQueue($);
+    return summaryText(queue, await today($), { withDone: verb === 'all' });
   }
-  if (/^\d+$/.test(verb)) {
-    const snapshot = await refresh($);
-    return snapshot.kind === 'ok' ? itemText(snapshot.queue, n, today()) : describe(snapshot);
-  }
-  if (!Number.isInteger(n)) return USAGE;
+  if (/^\d+$/.test(verb)) return itemText(await currentQueue($), Number(verb), await today($));
+  if (!/^\d+$/.test(arg)) return USAGE;
+  const n = Number(arg);
   if (verb === 'start') return startItem($, n);
   if (verb === 'done' || verb === 'drop') {
-    const state = verb === 'done' ? 'done' : 'dropped';
-    const input: ToolInput = { action: 'update', n, state, ...(text && { outcome: text }) };
-    const queue = await mutate($, queue => runTool(queue, input, today()).queue ?? queue);
-    return itemText(queue, n, today());
+    const outcome = rest.join(' ');
+    return apply($, { action: 'update', n, state: FINISH[verb], ...(outcome && { outcome }) });
   }
   return USAGE;
 }
-
 
 export const register: Register = (on, rawOptions) => {
   options = rawOptions as unknown as Options;
@@ -190,8 +220,8 @@ export const register: Register = (on, rawOptions) => {
         isDeferred: false,
       }),
     ]);
-    const snapshot = await refresh($, true);
-    if (snapshot.kind !== 'missing') poll ??= $.clock.every(POLL_MS, () => void refresh($));
+    poll ??= $.clock.every(POLL_MS, () => void refresh($));
+    void refresh($, true);
     return next(e);
   });
 
@@ -206,18 +236,9 @@ export const register: Register = (on, rawOptions) => {
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const { tool: _tool, tool_use_id: _id, ...input } = e;
     try {
-      poll ??= $.clock.every(POLL_MS, () => void refresh($));
-      if (input.action === 'list' || input.action === 'get') {
-        const snapshot = await refresh($);
-        if (snapshot.kind !== 'ok') return { result: describe(snapshot) };
-        return { result: runTool(snapshot.queue, input, today()).text };
-      }
-      let text = '';
-      await mutate($, queue => {
-        const ran = runTool(queue, input, today());
-        text = ran.text;
-        return ran.queue ?? queue;
-      });
+      const isRead = input.action === 'list' || input.action === 'get';
+      const text =
+        isRead ? runTool(await currentQueue($), input, await today($)).text : await apply($, input);
       return { result: text };
     } catch (error) {
       if (error instanceof QueueError) return { result: `Error: ${error.message}` };
@@ -227,9 +248,9 @@ export const register: Register = (on, rawOptions) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e);
-    const snapshot = (await $.state.get(snapshotRef)).value ?? null;
-    const tab: Tab = (await $.state.get(tabRef)).value ?? 'open';
-    const selected = (await $.state.get(selectedRef)).value ?? null;
+    const snapshot = await read($, snapshotAtom);
+    const tab: Tab = await read($, tabAtom);
+    const selected = await read($, selectedAtom);
 
     if (snapshot?.kind !== 'ok')
       return (
@@ -240,37 +261,36 @@ export const register: Register = (on, rawOptions) => {
       );
 
     const { queue } = snapshot;
-    const day = today();
-    const byN = new Map(queue.items.map(item => [item.n, item]));
-    const grouped = groupItems(queue, day);
-    const select = (n: number | null) => $.state.set(selectedRef, n);
+    const day = await today($);
+    const byN = byNumber(queue);
+    const select = (n: number | null) => update($, selectedAtom, () => n);
     const item = selected === null ? undefined : byN.get(selected);
 
-    if (item) {
-      const isOpen = item.state === 'queued';
+    if (item)
       return (
         <Box flexDirection="column" gap={1}>
           <Box gap={1}>
             <Button key="back" label="Back" hotkey="b" onPress={() => select(null)} />
-            {isOpen && (
+            {item.state === 'queued' && (
               <Button key="start" label="Start" variant="primary" hotkey="s" onPress={() => startItem($, item.n)} />
             )}
           </Box>
           <Text wrap="wrap">{itemText(queue, item.n, day)}</Text>
         </Box>
       );
-    }
 
+    const grouped = groupItems(queue, day, byN);
     const open = OPEN_GROUPS.reduce((sum, group) => sum + grouped[group].length, 0);
     const tabs: [Tab, string][] = [
       ['open', `Open ${open}`],
       ['running', `Running ${grouped.running.length}`],
       ['done', `Done ${grouped.done.length}`],
     ];
-    const groups: readonly Group[] =
-      tab === 'open' ? OPEN_GROUPS : [tab === 'running' ? 'running' : 'done'];
-    const row = (one: Item) => {
-      const label = rowLabel(one, byN, day);
+    const shown = (tab === 'open' ? OPEN_GROUPS : ALL_GROUPS.filter(group => group === tab)).filter(
+      group => grouped[group].length > 0,
+    );
+    const row = (group: Group) => (one: Item) => {
+      const label = rowLabel(one, group, byN, day);
       return (
         <Button key={`item-${one.n}`} plain onPress={() => select(one.n)}>
           <Text dimColor>{String(one.n).padStart(3)} </Text>
@@ -288,35 +308,27 @@ export const register: Register = (on, rawOptions) => {
               key={`tab-${id}`}
               label={label}
               variant={id === tab ? 'primary' : undefined}
-              onPress={() => $.state.set(tabRef, id)}
+              onPress={() => update($, tabAtom, () => id)}
             />
           ))}
           <Button key="refresh" label="Refresh" hotkey="r" dimColor onPress={() => refresh($, true)} />
         </Box>
-        {groups
-          .filter(group => grouped[group].length > 0)
-          .map(group => (
-            <Box key={`group-${group}`} flexDirection="column">
-              <Text bold color={GROUP_COLOR[group]}>
-                {GROUP_TITLE[group]} <Text dimColor>{grouped[group].length}</Text>
-              </Text>
-              {grouped[group].map(row)}
-            </Box>
-          ))}
-        {groups.every(group => grouped[group].length === 0) && (
-          <Text dimColor>Nothing here.</Text>
-        )}
+        {shown.map(group => (
+          <Box key={`group-${group}`} flexDirection="column">
+            <Text bold color={GROUP_COLOR[group]}>
+              {GROUP_TITLE[group]} <Text dimColor>{grouped[group].length}</Text>
+            </Text>
+            {grouped[group].map(row(group))}
+          </Box>
+        ))}
+        {shown.length === 0 && <Text dimColor>Nothing here.</Text>}
       </Box>
     );
   });
 };
 
-const USAGE =
-  'Usage: /queue [all | <n> | start <n> | done <n> [outcome] | drop <n> [reason]]';
-
-function describe(snapshot: QueueSnapshot): string {
-  if (snapshot.kind === 'missing')
-    return 'No queue file yet. Ask Claude to add an item with the queue tool, or set the file in /config.';
-  if (snapshot.kind === 'error') return `The queue file is invalid: ${snapshot.message}`;
-  return '';
+function describe(snapshot: Exclude<QueueSnapshot, { kind: 'ok' }>): string {
+  return snapshot.kind === 'missing' ?
+      'No queue file yet. Ask Claude to add an item with the queue tool, or set the file in /config.'
+    : `The queue file is invalid: ${snapshot.message}`;
 }
