@@ -74,6 +74,14 @@ The file is re-read when its modification time changes (checked every 20 seconds
 
 Claude Code's built-in tasks (TaskCreate, TaskList) track steps within a session or team, with `blockedBy` between tasks. They are kept under `~/.claude/tasks` on the machine running the session, so sessions on other machines or in separate cloud containers do not see them. This queue holds work that has not started yet, across sessions and machines that only share a folder, and its items wait on things outside the list: a PR merging, a person's decision, a date. Use tasks for the steps of a running item, and this queue for what runs next.
 
+## Where it runs
+
+Mods run only in Claude Code sessions: the terminal, the desktop app's Code tab, IDE extensions and Cowork. In a claude.ai project, the project chat (the coordinator) is not a Claude Code session, so it can't load this mod, and nothing from it (pane, status line, `/queue`, the `queue` tool) shows there. Project threads do load it once the plugin is enabled on the account, including threads that were already running.
+
+For a view of the queue in the project chat, publish the file to an artifact page and keep it current from a thread or a scheduled task. The plugin can't do this for the chat.
+
+A cloud session reads the plugin's options from `~/.claude/settings.json`, so set them in the environment's setup script. With the default `file`, the plugin looks for `work-queue.json` in the session's working directory.
+
 ## Install
 
 ```sh
