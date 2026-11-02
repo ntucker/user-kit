@@ -76,11 +76,9 @@ Claude Code's built-in tasks (TaskCreate, TaskList) track steps within a session
 
 ## Where it runs
 
-Mods run only in Claude Code sessions: the terminal, the desktop app's Code tab, IDE extensions and Cowork. In a claude.ai project, the project chat (the coordinator) is not a Claude Code session, so it can't load this mod, and nothing from it (pane, status line, `/queue`, the `queue` tool) shows there. Project threads do load it once the plugin is enabled on the account, including threads that were already running.
+Mods never load in a claude.ai project chat (see the root README), so the pane, status line, `/queue` and the `queue` tool don't show there. For a view of the queue in the chat, publish the file to an artifact page and keep it current from a thread or a scheduled task.
 
-For a view of the queue in the project chat, publish the file to an artifact page and keep it current from a thread or a scheduled task. The plugin can't do this for the chat.
-
-A cloud session reads the plugin's options from `~/.claude/settings.json`, so set them in the environment's setup script. With the default `file`, the plugin looks for `work-queue.json` in the session's working directory.
+In a cloud session, set `file` in the setup script's settings. Its default, `work-queue.json`, is looked up in the session's working directory.
 
 ## Install
 
