@@ -6,62 +6,39 @@ disable-model-invocation: true
 
 # Conceptual compression
 
-Rewrite a source text as the fewer, more general ideas its specifics follow from. A source usually records what its author had seen: lists of cases, examples standing in for whole areas, prescriptions tied to one situation. The result states what those were instances of.
+Rewrite a source text as the fewer, more general ideas its specifics are instances of. The measure is decisions, not words: a reader holding only the result should settle every case the way the source would (for explanatory text: reach every conclusion it supports), including cases the source never listed but its reasons reach, and should receive no instruction the source would not give. Rewording the same ideas, or summarizing what the text is about, is a different job.
 
-The measure is decisions, not words. A reader holding only the result should settle every case the way the source would (for explanatory text: reach every conclusion it supports), including cases the source never listed but its reasons reach, and should receive no instruction the source would not give. Fewer words follow from fewer ideas. Tightening the wording of the same ideas, or summarizing what the text is about, is a different job.
+Compress too little and a list remains, silent on the unlisted case and free to contradict itself unnoticed. Compress too much and a statement fits any behavior (vacuous), a concept is gone (lost), or a rule governs cases the source never meant (overreach). Having read the source, you cannot see either from the inside, so independent readers judge every step.
 
-Both directions fail:
-
-| Compression | What goes wrong |
-|---|---|
-| Too little | Still a list. A list is silent on the unlisted case, and rules stated separately can contradict each other unnoticed. |
-| Too much | A statement that fits any behavior (vacuous), a concept that is gone (lost), or a rule that now governs cases the source never meant (overreach). |
-
-You cannot find the point between them from the inside: you have read the source, so your abstraction reads as complete to you. Independent readers judge every step instead.
-
-| The user wants | What decides right and wrong | Do |
-|---|---|---|
-| The same meaning in fewer ideas (default) | The source | The procedure below |
-| A simpler design, and accepts that behavior may change | The objective the design serves | The procedure below, then read [Smoothing a design](references/smoothing.md) |
+The source decides what is right. When the user wants a simpler design and accepts that behavior may change, the objective the design serves decides instead: read [Smoothing a design](references/smoothing.md) first, which fixes the objective and then runs the procedure below as one of its steps.
 
 ## Roles
 
-| Role | Model | Sees | Returns |
-|---|---|---|---|
-| Compressor | You, ideally a strong model (Opus, Fable, GPT Sol) | Everything | Each candidate |
-| Grader | An efficient model (Haiku, Grok, Terra) | Source and candidate | What is lost, overreaching, vacuous, or still collapsible; continue or stop |
-| Validator | A mid-tier model (Sonnet), the kind of reader that will act on the result | Candidate and probe statements only | True, false, or open for each probe |
+You are the compressor, ideally a strong model (Opus, Fable, GPT Sol). Two judges read each candidate:
 
-The model names are examples; pick the nearest tiers your harness offers. Comparing two texts is cheap work, so the grader is the cheapest model. Applying a text to cases it does not list takes more: a cheap model given even the full source answers "open" on unlisted cases, so as a validator it cannot tell a candidate that generalizes from one that only kept the list.
+| Judge | Model | Sees |
+|---|---|---|
+| Grader | An efficient model (Haiku, Grok, Terra): comparing two texts is cheap work | Source and candidate |
+| Validator | A mid-tier model (Sonnet), the kind of reader that will act on the result | Candidate and probe statements only |
 
-Run both judges as subagents with a fresh context every round. A validator that saw an earlier, longer candidate remembers what the shorter one dropped and is no longer blind. Where the judges can read files, keep the source, each candidate, and the probe statements as scratch files and pass paths, so the source reaches the grader verbatim without you retyping it; name only the candidate and probe files to the validator. If the harness cannot give you another model or a fresh context, run the checks yourself and say in the report that they were not independent.
+The model names are examples; pick the nearest tiers your harness offers. Finding the idea behind a set of specifics is the hard part, and with a mid-tier compressor the loop has not produced a shorter result than a plain rewrite, so tell the user when you are not a strong model. The validator cannot be the cheapest: a cheap model answers "open" on unlisted cases even from the full source, so it cannot tell a candidate that generalizes from one that only kept the list.
+
+A judge's verdict counts only while it is independent of you and of earlier rounds. Run each as a subagent with a fresh context every round, and send it its prompt and its texts and nothing else: an earlier round's judge remembers what a shorter candidate dropped, and an explorer has read the source and everything around it, so neither serves as a judge. Your reading of the intent, your collapse notes, what changed since the last candidate, or the answers you expect would turn an independent check into a confirmation of your own view, so no judge is told any of them. Pass file paths where judges can read files, so the source reaches the grader verbatim. If the harness cannot give you another model or a fresh context, run the checks yourself and say in the report that they were not independent.
 
 ## Procedure
 
 1. **Fix the source.** Keep a verbatim copy. Every round is judged against it and never against the previous candidate, or each round's small loss compounds. Write down, in a sentence or two, who acts on this text and what it is trying to get them to do. Collapses move toward that intent; a generalization that fits the examples but not the intent is where overreach comes from.
-2. **Explore, if the source is not the whole idea.** Read [Exploring before compressing](references/exploring.md) when the user asks for it, the source points outside itself (other files, earlier decisions, "the usual cases"), the user gave a subject and no text, or you could not write the intent sentence without guessing. What it gathers joins the fixed source, marked as gathered.
+2. **Explore, if the source is not the whole idea.** Read [Exploring before compressing](references/exploring.md) when the user asks for it, the source points outside itself, the user gave a subject and no text, or you could not write the intent sentence without guessing.
 3. **Write the probes** (see Probes) from the fixed source alone, before any compressing, so they test the source's meaning and not your candidate.
-4. **Baseline the probes.** Run the validator on the source itself. Unlisted-case probes may come back open here, and those stay (see Probes). Any other probe the source fails is a wrong probe or a real ambiguity in the source: fix or drop the probe, and keep the ambiguity for the report.
-5. **Loop**, at most 6 rounds:
-   1. *Compress* (see Collapses). In the first round go straight to the level of ideas: for each cluster of specifics, write the one statement they are instances of, and keep a specific only where Collapses says to. Be bold. The judges will show what has to come back, and restoring a named loss is cheap. A cautious first candidate gives them nothing to find, and the loop ends where it began. In later rounds, fix everything the judges found and make every collapse still open, not one per round, since each round costs two judge runs. Note each collapse in one line (what went in, what replaced it) so a finding can be traced to the collapse that caused it.
-   2. *Judge.* Run the grader and the validator on the candidate, in parallel.
-   3. *Decide* (see Deciding): repair, compress further, or stop.
+4. **Baseline the probes.** Run the validator on the source itself. A probe the source fails is a wrong probe or a real ambiguity in the source: fix or drop the probe, and keep the ambiguity for the report. Unlisted-case probes are the exception: they may come back open here, and they stay.
+5. **Loop**, at most 6 rounds: compress, run both judges on the candidate in parallel, then decide (see Deciding).
 6. **Report** (see Report). Do not overwrite the source unless asked.
 
-## Collapses
+## Compressing
 
-| In the source | Collapse to | Keep |
-|---|---|---|
-| Several examples of one thing | The rule they show | One example, only if the rule is ambiguous without it |
-| Rules that share a reason | The reason, stated as the rule | |
-| A list of cases | What qualifies a case for the list | Members the criterion would not predict |
-| A prescription for one situation | The goal it serves | The prescription, when the means is not derivable from the goal |
-| A rule with exceptions | The narrower rule the exceptions reveal | |
-| Two rules that conflict in some case | One rule conditioned on what decides between them | If the source does not say what decides, flag it; do not choose |
-| An anecdote or history | The reason it is evidence for | |
-| A repeat | One statement | |
+Replace each group of specifics with what generates them: examples with the rule they show, rules that share a reason with that reason, a list with what qualifies a case for it, a prescription with the goal it serves, a rule and its exceptions with the narrower rule the exceptions reveal, an anecdote with what it is evidence for. Keep a specific only where nothing generates it, and state it exactly beside the principle it belongs to: a member its criterion would not predict, a means that cannot be derived from its goal, an example its rule is ambiguous without, and any name, number, command, threshold, arbitrary convention, or fact that contradicts what its principle predicts.
 
-Some content is irreducible: names, numbers, commands, thresholds, arbitrary conventions, and anything that contradicts what its principle predicts. Nothing generates these, so state them exactly, beside the principle they belong to. A principle plus its exceptions is shorter and truer than a principle stretched to swallow them.
+A statement that replaces others keeps their force and each one's own scope. Left alone, a merge takes the widest scope and the weakest force of its parts, so one rule's "in integration tests" or "never" disappears, and a reason standing in for rules ("a retry hides the cause") forbids nothing until it is stated as a rule. Where two rules conflict in some case, state one rule conditioned on what decides between them; if the source does not say what decides, flag it and do not choose.
 
 The altitude to aim for, on a small source:
 
@@ -78,22 +55,24 @@ Result
 Every reply tells the customer what happens next and when; if that is not known yet, it says when the next update will come. Nothing in a reply hands the problem back to them, as citing policy, an earlier message, or the FAQ does. Two things are not yours to say: a refund over $50 before a lead approves it, and anything in answer to a legal threat, which goes to the escalations queue. Refunds take 3 to 5 business days to appear.
 ```
 
-The banned phrases became the criterion that bans them, which also covers phrases nobody listed. The three situation rules became the goal they serve. The approval threshold, the queue, and the refund timing are irreducible and stay exact. A result that still has one line per source line has been reworded, not compressed.
+A result that still has one line per source line has been reworded, not compressed.
 
-Write the result in the source's own form and register, in full sentences. Telegraphic wording saves words and costs the reader the meaning, which is the wrong trade here.
+In the first round go straight to the level of ideas and be bold: restoring a loss the judges name is cheap, and a cautious first candidate gives them nothing to find, so the loop ends where it began. In later rounds fix everything the judges found and make every collapse still open, since each round costs two judge runs. Note each collapse in one line so a finding can be traced to the collapse that caused it.
+
+Write the result in the source's own form and register, in full sentences. Telegraphic wording saves words and costs the reader the meaning.
 
 ## Probes
 
-A probe is a statement about one concrete case that the source makes true, makes false, or leaves open. The validator judges each from the candidate alone, so a probe passes only if the candidate carries the idea by itself.
+A probe is a statement about one concrete case that the source makes true, makes false, or leaves open. It passes only if the candidate carries the idea by itself. A probe asks about a decision some reader will face, never about recalling the source, and writing one is a commitment to keep what it tests.
 
-- A probe asks about a decision some reader will face. It never asks them to recall the source (who said it, which incident, how it was worded). Writing a probe is a commitment to keep what it tests, so details no one decides by get none.
-- Give every idea you expect in the result one or two probes, aimed at its least obvious case. Count ideas, not source lines.
-- Probe every exception, condition, and scope limit from both sides. Cases just outside the source's scope have the expected answer "open" and are what catches overreach.
-- Add a few unlisted cases the source's reasons plainly reach. They catch a candidate that memorized the list. The source itself may answer "open" on these at baseline; that gap is what compression should close. Keep them, and name them in the report, because their expected answer is your inference.
-- Prefer statements a reader could not answer without the text. Validators answer from general knowledge when the text is silent, so a probe whose answer is common practice passes against anything.
-- Mix expected answers so that agreeing with everything fails. 10 to 20 probes suit a page of source.
+Write each probe so that one kind of failure would change its answer:
 
-Keep the expected answers to yourself; the validator gets the statements only.
+- **A lost idea.** One or two probes for every idea you expect in the result (count ideas, not source lines), aimed at its least obvious case, and one on each side of every exception, condition, and scope limit.
+- **Overreach.** Cases just outside the source's scope, whose expected answer is "open".
+- **A memorized list.** A few unlisted cases the source's reasons plainly reach. Name them in the report, because their expected answer is your inference.
+- **A validator that is not reading.** Prefer statements nobody could answer without the text, and mix the expected answers so that agreeing with everything fails.
+
+10 to 20 probes suit a page of source.
 
 Validator prompt:
 
@@ -139,32 +118,21 @@ CANDIDATE: <candidate, or its path>
 ORIGINAL: <source, or its path>
 ```
 
-Send the judges these prompts and the texts, nothing else. Your reading of the intent, your collapse notes, or a hint about what changed turns an independent check into a confirmation of your own view.
-
 ## Deciding
 
-Check every finding and every probe mismatch against the source before acting on it. The judges run on cheaper models than you and are sometimes wrong, but a judge failing to find something in the candidate is itself evidence of how the candidate reads.
+Check every finding and every probe mismatch against the source before acting on it. The judges run on cheaper models than you and are sometimes wrong, so a failing probe is not automatically the candidate's fault and a passing one is not proof: read the words the validator says it relied on, because a right answer quoted from nowhere in the candidate came from general knowledge. A judge failing to find what the candidate does say is still evidence of how the candidate reads.
 
-| Signal | Meaning | Do |
-|---|---|---|
-| Probe expected true or false, validator says open | The idea is gone, or its statement is too vague to apply | Restore it, at the most general wording that settles the probe |
-| Probe expected open, validator says true or false | Overreach | Narrow the statement to the source's scope or condition |
-| Validator gives the opposite answer | The statement misleads, or the probe is wrong | Recheck the probe against the source, then fix whichever is at fault |
-| Grader: lost, overreach, or vacuous, and the source bears it out | A collapse went too far | Repair the idea, and add a probe for it so it cannot quietly recur |
-| Grader: collapsible, and the merge would hold | Not compressed enough | Make it the next collapse |
-| Grader: a finding the source does not bear out | Grader noise | Drop it |
+A miss that survives the check says which way the candidate erred:
 
-A candidate holds when every probe passes and no finding of lost, overreach, or vacuous survives your check.
+- **It leaves open what the source settles** (a probe expected true or false comes back open; the grader finds something lost or vacuous). The idea is gone or too vague to apply. Restore it at the most general wording that settles the case. Pasting the lost item back grows the list again, so restore verbatim only what is irreducible.
+- **It settles what the source leaves open** (a probe expected open comes back true or false; the grader finds overreach). Narrow the statement to the source's scope or condition.
+- **It gives the opposite answer.** The statement misleads or the probe is wrong. Recheck the probe against the source, then fix whichever is at fault.
 
-| The candidate | Next |
-|---|---|
-| Does not hold | Repair at the level of the idea. Pasting the lost item back grows the list again, so look for the general statement that would have produced it, and restore an item verbatim only when it is irreducible. If a collapse still fails after one repair, undo it and do not retry it. |
-| Holds, and a collapse is left to try (the grader's, or one you see) | It is the best so far. Make that collapse next. |
-| Holds, and no collapse is left | Stop. |
+Add a probe for anything the grader caught and the probes did not, so it cannot quietly recur. If a collapse still fails after one repair, undo it and do not retry it.
 
-Holding is not a reason to stop: a candidate that changed little holds trivially. The stopping point is known only once going further has been tried and broke, or neither you nor the grader can name anything further to try. Stop also when two rounds in a row produce no shorter candidate that holds, or at the round limit.
+A candidate holds when every probe passes and no finding of lost, overreach, or vacuous survives your check. Holding makes it the best so far and is not a reason to stop, because a candidate that changed little holds trivially. Make the next collapse, the grader's (when the merge would hold) or one you see, and stop when none is left: going further has been tried and broke, or neither you nor the grader can name anything further to try. A statement that covers two ideas and that neither idea's author would recognize is not a collapse; they are two ideas. Stop also when two rounds in a row produce no shorter candidate that holds, or at the round limit.
 
-Return the shortest candidate that held, exactly as it was judged. An edit made after the last judging is a new candidate that nobody has checked, so judge it or leave it out. Before returning it, run the validator on it once more in a fresh context: validators vary at the edge, and a probe that fails on a second read marks an idea stated too thinly to rely on. Repair that and judge again.
+Return the shortest candidate that held, exactly as it was judged: an edit after the last judging is a candidate nobody has checked. Before returning it, run the validator on it once more in a fresh context. Validators vary at the edge, and a probe that fails on a second read marks an idea stated too thinly to rely on; repair that and judge again, once, even past the round limit.
 
 ## Report
 
@@ -183,11 +151,4 @@ Return the shortest candidate that held, exactly as it was judged. An edit made 
 <n> rounds, stopped because <reason>. <source words> -> <result words> words. Probes: <passed>/<total>.
 ```
 
-Omit a line that has nothing to report. "Now also covers" and "Needs your call" are where you inferred intent, so they are what the user most needs to check.
-
-## Gotchas
-
-- A merged statement silently takes the widest scope and the weakest force of its parts. One rule's "in integration tests" or "never" disappears in the merge. Carry each part's own qualifiers into the result.
-- A reason is not a rule. "A retry hides the cause" forbids nothing; when a reason replaces rules, state it with their force.
-- A failing probe is not automatically the candidate's fault, and a passing one is not proof. Read the words the validator says it relied on: a right answer quoted from nowhere in the candidate came from general knowledge.
-- Deeper is not always better. When the only statement that covers two ideas is one neither idea's author would recognize, they are two ideas.
+Omit a line that has nothing to report. "Now also covers" and "Needs your call" are where you inferred intent, so they are what the user most needs to check. Give each gathered item that shaped the result its own "Added from exploration" line with its origin (path and line, or URL): a grouped list hides which statements the user did not write and where to check them.
