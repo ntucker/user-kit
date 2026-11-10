@@ -42,7 +42,7 @@ PROPOSALS:
 <n>. Today: <behavior>. Proposed: <behavior>. Cases that change: <concrete cases>.
 ```
 
-Check each ruling against the objective yourself, as with any judge. Adopt a change only on ACCEPT that the objective's words bear out. Treat a ruling you doubt as ASK: an unneeded question costs the user a moment, and a wrongly adopted change costs them a behavior they needed. When parallel things are unified and the objective does not say onto which, the choice of value is itself an ASK.
+Check each ruling against the objective yourself, as with any judge. Adopt a change only on ACCEPT that the objective's words bear out. Treat a ruling you doubt as ASK: an unneeded question costs the user a moment, and a wrongly adopted change costs them a behavior they needed. When parallel things are unified and the objective does not say onto which, the choice of value is itself an ASK. A general permission from the user ("change whatever the goals allow") is what starts smoothing and does not settle an ASK: only the objective's words, or the user's answer about that one change, do.
 
 When the user is present and a single ASK blocks most of the remaining simplification, ask them then. Otherwise carry the open proposals to the report and continue with the accepted ones.
 

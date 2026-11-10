@@ -1,6 +1,6 @@
 {
   "skill_name": "conceptual-compression",
-  "notes": "The skill is invoked by the user, so each with-skill run is told to read and follow it. Each case copies its files into a fresh workspace. Cases 1 and 2 are faithful compression and are also scored by blind probes: files/<name>.probes.md holds statements with the answer the source gives; a fresh mid-tier reader judges them from the result alone (validator prompt in SKILL.md) and the score is the share that match. Case 3 is design smoothing against an objective. Case 4 starts from partial notes and needs the explore step.",
+  "notes": "The skill is invoked by the user, so each with-skill run is told to read and follow it. Each case copies its files into a fresh workspace. Cases 1 and 2 are faithful compression and are also scored by blind probes: files/<name>.probes.md holds statements with the answer the source gives; a fresh mid-tier reader judges them from the result alone (validator prompt in SKILL.md) and the score is the share that match. Case 3 is design smoothing against an objective. Case 4 starts from partial notes and needs the explore step. Case 5 has no fixture files: it runs in a checkout of reactive/data-client at commit 52d3833e764c1ece69a013d308e16b1a3d02e03c, and files/queryable.probes.md is scored against the overview alone, so an open answer is a miss. The loop's compressor is meant to run on the strong tier with the judges on the tiers SKILL.md names, which is a deliberate exception to running skill evals on a mid-tier model: on a mid-tier compressor the with-skill result of case 1 came out at 79% of the source's word count, above the 70% its assertion asks for.",
   "evals": [
     {
       "id": 1,
@@ -76,6 +76,23 @@
         "The `console.log` of `session.userEmail` in services/auth/session.ts is raised as contradicting the rules",
         "The notes' claim that debug logs are off in production is corrected or raised, not repeated as fact",
         "logging-notes.md and the files under docs/ and services/ are unchanged"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "explain-queryable",
+      "prompt": "there's no succinct overview of Queryable anywhere in this repo, it's spread across the schema docs, useQuery, Controller and the source. explore the docs and packages first to get the full picture, then compress it into an overview of the concept: what it is, when it should be used, how it works. save it as queryable-overview.md",
+      "files": [],
+      "expected_output": "A short overview built from a few statements a reader can apply to a schema nobody listed: a schema is Queryable when its queryKey() can produce, from args and the store alone, the normalized result an endpoint would have stored, so its value can be read without an endpoint; that one capability is what useQuery, Controller.get and Snapshot.get, the input of Query, Controller.set and rendering before an endpoint resolves all rely on; which schemas are Queryable follows from it (Entity by pk or index, All, Collection, Union, Object, Query and Scalar are; Array, Values and Invalidate are not; Lazy only through .query); a read never fetches and a missing or invalid value is undefined. Each part is attributed to the doc or source file it came from, and places where the docs and the source disagree are raised.",
+      "assertions": [
+        "queryable-overview.md states the rule that decides whether a schema is Queryable (its queryKey() returns something, computed from args and the store), and does not only list the member schemas",
+        "queryable-overview.md says a read through a Queryable never fetches and that a missing or invalid value comes back as undefined",
+        "queryable-overview.md names the places a Queryable is accepted: useQuery, Controller.get or Snapshot.get, the input of Query, and Controller.set",
+        "queryable-overview.md says Array, Values and Invalidate are not Queryable, and that Lazy is only through its .query accessor",
+        "queryable-overview.md is at most 800 words, not counting code blocks",
+        "A blind mid-tier reader given only queryable-overview.md answers at least 17 of the 20 statements in files/queryable.probes.md as the repository does",
+        "The reply or an accompanying note says where each part of the overview was found, as doc or source paths",
+        "No file in the checkout other than queryable-overview.md and the run's own working files is changed"
       ]
     }
   ]
