@@ -74,6 +74,8 @@ Write each probe so that one kind of failure would change its answer:
 
 10 to 20 probes suit a page of source.
 
+Your own probes cover what you thought mattered, and you repair until they pass, so a candidate can pass all of them and still have lost what you did not think to ask about. Before compressing, have a fresh validator-tier subagent write a held-out set from the fixed source alone: give it the guidance above and two scratch paths, one for its statements and one for their expected answers. Do not open either file, and use the set in no round.
+
 Validator prompt:
 
 ```
@@ -132,7 +134,7 @@ Add a probe for anything the grader caught and the probes did not, so it cannot 
 
 A candidate holds when every probe passes and no finding of lost, overreach, or vacuous survives your check. Holding makes it the best so far and is not a reason to stop, because a candidate that changed little holds trivially. Make the next collapse, the grader's (when the merge would hold) or one you see, and stop when none is left: going further has been tried and broke, or neither you nor the grader can name anything further to try. A statement that covers two ideas and that neither idea's author would recognize is not a collapse; they are two ideas. Stop also when two rounds in a row produce no shorter candidate that holds, or at the round limit.
 
-Return the shortest candidate that held, exactly as it was judged: an edit after the last judging is a candidate nobody has checked. Before returning it, run the validator on it once more in a fresh context. Validators vary at the edge, and a probe that fails on a second read marks an idea stated too thinly to rely on; repair that and judge again, once, even past the round limit.
+Return the shortest candidate that held, exactly as it was judged: an edit after the last judging is a candidate nobody has checked. Before returning it, run the validator on it once more in a fresh context, on your probes and the held-out statements together, and only then open the held-out answers. Validators vary at the edge, and a probe that fails on a second read marks an idea stated too thinly to rely on; a held-out probe that fails, once you have checked it against the source like any other mismatch, is a loss your own probes missed. Repair either and judge again, once, even past the round limit.
 
 ## Report
 
