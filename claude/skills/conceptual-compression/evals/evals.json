@@ -1,0 +1,82 @@
+{
+  "skill_name": "conceptual-compression",
+  "notes": "The skill is invoked by the user, so each with-skill run is told to read and follow it. Each case copies its files into a fresh workspace. Cases 1 and 2 are faithful compression and are also scored by blind probes: files/<name>.probes.md holds statements with the answer the source gives; a fresh mid-tier reader judges them from the result alone (validator prompt in SKILL.md) and the score is the share that match. Case 3 is design smoothing against an objective. Case 4 starts from partial notes and needs the explore step.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "testing-rules",
+      "prompt": "testing-rules.md has turned into a pile of one-off rules that nobody reads end to end. conceptually compress it: fewer, more general statements that still lead to the same decisions. don't touch the original, save the result as testing-rules.compressed.md",
+      "files": [
+        "evals/files/testing-rules.md"
+      ],
+      "expected_output": "Three or four principles (real dependencies where they can run and be reset locally, fakes only for what a test cannot control or take back; assert on what a caller observes; names state behavior and condition; a result depends only on the test) with the irreducible facts kept exactly, at roughly half the length, plus a short account of what was generalized, kept, dropped, and inferred.",
+      "assertions": [
+        "testing-rules.compressed.md has at most 70% of the source's word count",
+        "A fresh reader given only testing-rules.compressed.md matches the source's answer on at least 18 of the 20 probes in testing-rules.probes.md",
+        "The result keeps these exactly: `--runInBand` with the shared Postgres on port 5433, the 30s and 5s timeouts, 80% line coverage on `packages/core` only, `resetDb()`, and `it.skip` with a ticket link",
+        "The result states what decides real versus fake as a criterion a reader could apply to an unlisted dependency, and still fakes email and Stripe test mode",
+        "The result keeps the audit-log exception, the nightly contract tests that use the network, and the scope of `packages/api` and `packages/core`",
+        "The reply or an accompanying note tells the user what was generalized and what was dropped or inferred",
+        "testing-rules.md is unchanged"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "api-errors",
+      "prompt": "api-errors.md is my onboarding ramble about error handling in the public API. boil it down to the principles so it can go in the handbook, but keep anything someone would actually need to look up. write it to api-errors.compressed.md",
+      "files": [
+        "evals/files/api-errors.md"
+      ],
+      "expected_output": "Principles (say what the caller can fix and nothing they cannot use; never reveal internals or existence; codes are a contract and messages are not; log once at the boundary; retry only what is harmless twice) with status codes, body shape, header, code format and Sentry rates kept, scoped to the public API handlers.",
+      "assertions": [
+        "api-errors.compressed.md has at most 70% of the source's word count",
+        "A fresh reader given only api-errors.compressed.md matches the source's answer on at least 18 of the 20 probes in api-errors.probes.md",
+        "The result keeps these exactly: the error body shape, `ERR_<DOMAIN>_<REASON>`, `X-Request-Id`, `Retry-After` on 429, and Sentry at 100% of 5xx and 10% of 4xx",
+        "The result keeps 404 instead of 403 for another account's resource, with its reason",
+        "The result stays scoped to the public API handlers and does not apply its rules to batch jobs or internal tools",
+        "The reply or an accompanying note tells the user what was generalized and what was dropped or inferred",
+        "api-errors.md is unchanged"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "export-design",
+      "prompt": "export-spec.md is how report export works today and it's full of special cases. export-goals.md is what export is actually for. find me a simpler design. i'm fine with behavior changing wherever the goals allow it. write the simplified spec to export-spec.simplified.md and tell me exactly what would behave differently",
+      "files": [
+        "evals/files/export-spec.md",
+        "evals/files/export-goals.md"
+      ],
+      "expected_output": "A spec of a few uniform rules (everyone who can see a report exports what they see, in any format; one size threshold decides immediate versus emailed; one link expiry; one file name pattern taken from the CSV one; every export audited; each format writes dates its own way), with each behavior change listed against the goal that allows it, and choices the objective does not settle (which link lifetime) raised for the user.",
+      "assertions": [
+        "The simplified spec keeps the CSV file name pattern `<report>-<YYYY-MM-DD>.csv`",
+        "The simplified spec audits every export, with the under-100-rows exception removed",
+        "XLSX no longer exports hidden columns, and no format exports hidden columns",
+        "Large exports are still generated off the request path, so the browser is not blocked",
+        "The PDF 500-row cap is removed and PDF follows the same delivery rule as the other formats",
+        "Role differences (Viewer formats, Admin link expiry) are removed, citing the non-goal",
+        "Which single link lifetime replaces the 7-day and 30-day ones is raised as the user's call, since the objective rules out the role difference but not the value",
+        "Per-format date writing is kept as one stated principle and is not changed",
+        "Every behavior change is listed separately from lossless restatement, as today's behavior and the proposed one, with the goal or constraint that allows it",
+        "export-spec.md and export-goals.md are unchanged"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "explore-logging",
+      "prompt": "logging-notes.md is just what i remember about our logging rules, it's nowhere near complete. look through docs/incidents and services/ first to get the full picture, then compress the whole thing into the rules we should actually write down. save to logging-rules.md",
+      "files": [
+        "evals/files/logging/"
+      ],
+      "expected_output": "A few rules (log through a request-scoped child of the shared logger; log identifiers and measurements that describe the event, never its content or anything secret or personal, at any level, because level is configuration; one info line per request, per-item detail at debug; errors at error level) with the 8 KB line limit and the cents convention kept, each gathered item attributed to where it was found, and the contradictions raised: the leftover console.log of an email in services/auth/session.ts, and the notes' belief that debug is off in production.",
+      "assertions": [
+        "logging-rules.md forbids logging secrets at any level and says why level is not a safeguard, which is only in the token-leak incident",
+        "logging-rules.md keeps the collector's 8 KB per-line limit, which is only in the log-bill incident",
+        "logging-rules.md states a criterion a reader could apply to a kind of data nobody listed, such as a phone number or a query string (log what identifies or measures the event, not its content or personal data)",
+        "The reply or an accompanying note says which rules came from exploration and where each was found",
+        "The `console.log` of `session.userEmail` in services/auth/session.ts is raised as contradicting the rules",
+        "The notes' claim that debug logs are off in production is corrected or raised, not repeated as fact",
+        "logging-notes.md and the files under docs/ and services/ are unchanged"
+      ]
+    }
+  ]
+}
