@@ -24,3 +24,4 @@ Statements for a blind reader, with the answer the source gives (T true, F false
 | 18 | A test of an API endpoint should compare the entire response body against a stored snapshot. | F |
 | 19 | An integration test may use `waitFor` with a 2-second timeout chosen by trial and error to let a queue job finish. | F |
 | 20 | Unit tests time out at 30 seconds. | F |
+| 21 | A unit test of a pure pricing function in `packages/core` is forbidden from replacing the Postgres client with a mock. | O |

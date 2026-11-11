@@ -24,3 +24,6 @@ Statements for a blind reader, with the answer the source gives (T true, F false
 | 18 | An outbound DELETE may be retried automatically. | T |
 | 19 | A validation error should be logged by the handler that detected it and again by the error middleware. | F |
 | 20 | Customers' client code must retry any 5xx response up to three times. | O |
+| 21 | A list request that asks for a page size of 250 gets a 400. | T |
+| 22 | A request to create a webhook whose URL starts with `http://` gets a 400. | T |
+| 23 | A request with an amount of 10.125 gets a 400. | T |

@@ -68,6 +68,7 @@ A probe is a statement about one concrete case that the source makes true, makes
 Write each probe so that one kind of failure would change its answer:
 
 - **A lost idea.** One or two probes for every idea you expect in the result (count ideas, not source lines), aimed at its least obvious case, and one on each side of every exception, condition, and scope limit.
+- **A lost fact.** For each number, name, or limit a reader needs, a case its value decides, stated without the value: "a page size of 250 is rejected", never "a page size over the limit of 200 is rejected", which hands the validator the fact and passes on a text that lost it.
 - **Overreach.** Cases just outside the source's scope, whose expected answer is "open".
 - **A memorized list.** A few unlisted cases the source's reasons plainly reach. Name them in the report, because their expected answer is your inference.
 - **A validator that is not reading.** Prefer statements nobody could answer without the text, and mix the expected answers so that agreeing with everything fails.
@@ -149,8 +150,9 @@ Return the shortest candidate that held, exactly as it was judged: an edit after
 - Dropped: <item> - <why no decision depends on it>
 - Now also covers: <unlisted case> - <the source's reason that reaches it>
 - Needs your call: <conflicts or ambiguities in the source that the text alone could not settle>
+- Held-out miss: <statement, the answer expected and the answer given> - <why it is not a loss>
 
-<n> rounds, stopped because <reason>. <source words> -> <result words> words. Probes: <passed>/<total>.
+<n> rounds, stopped because <reason>. <source words> -> <result words> words. Probes: <passed>/<total>. Held-out: <passed>/<total>.
 ```
 
-Omit a line that has nothing to report. "Now also covers" and "Needs your call" are where you inferred intent, so they are what the user most needs to check. Give each gathered item that shaped the result its own "Added from exploration" line with its origin (path and line, or URL): a grouped list hides which statements the user did not write and where to check them.
+Omit a line that has nothing to report. "Now also covers" and "Needs your call" are where you inferred intent, and "Held-out miss" is where you overruled the one check you did not write, so they are what the user most needs to check. Give each gathered item that shaped the result its own "Added from exploration" line with its origin (path and line, or URL): a grouped list hides which statements the user did not write and where to check them.
