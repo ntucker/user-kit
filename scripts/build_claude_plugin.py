@@ -54,9 +54,10 @@ SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", r
 SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
 SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
 ANY_MARKER = re.compile(r"<!-- /?(subagent-only|claude-skill)")
-# A plain (unquoted) YAML value cannot hold ": " or " #". Harnesses parse it leniently,
-# but GitHub and strict YAML parsers reject the whole frontmatter.
-UNSAFE_PLAIN_VALUE = re.compile(r"^(\w+):[ \t]+(?![\"'|>]).*(: | #)", re.M)
+# A plain (unquoted) YAML value cannot hold ": " or end in ":", and " #" starts a comment
+# that silently truncates it. Harnesses parse these leniently, but GitHub and strict YAML
+# parsers reject the whole frontmatter. skills-best-practices' validate_skill.py has the same rule.
+UNSAFE_PLAIN_VALUE = re.compile(r"^([\w-]+):[ \t]+(?![\"'|>]).*?(: | #|:$)", re.M)
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
@@ -67,7 +68,7 @@ EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 def check_frontmatter(path: Path) -> None:
     text = path.read_text()
     if text.startswith("---\n") and (bad := UNSAFE_PLAIN_VALUE.search(text[: text.find("\n---", 3)])):
-        sys.exit(f"{path.relative_to(ROOT)}: quote the {bad.group(1)} value; unquoted it contains {bad.group(2)!r}")
+        sys.exit(f"{path.relative_to(ROOT)}: quote the {bad.group(1)} value; unquoted, {bad.group(2).strip()!r} breaks strict YAML")
 
 
 def to_claude(name: str, frontmatter: str) -> str | None:
