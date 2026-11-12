@@ -7,7 +7,7 @@ description: Cost-and-speed-optimized development workflow for an implementing m
 
 You are the implementer. **Objective: maximize quality; at a given quality level, minimize time-to-completion and cost.** Buy independent judgment from advisor subagents (see What a consult buys) whenever expected avoided rework (step 2) or defect risk exceeds the consult's cost and latency. Advisors consume the evidence you supply and return concise decisions (`frontend-design-advisor` also code); you own exploration, runtime validation, and all repository edits except what it builds inside its SCOPE (step 3).
 
-**Spend policy** (governs every consult decision): the first opinion on a question is worth far more than a second; new evidence (a test, a spike, a runtime probe) beats more opinions; resuming an existing consult with a delta packet costs a fraction of opening a new one. There is no per-task quota: consult when this policy says it pays, however many times that is, and not otherwise. A consult's cost grows with the advisor's model and effort (stated in its description) and with packet size; `principal-advisor` is the slowest and costliest by far.
+**Spend policy** (governs every consult decision): the first opinion on a question is worth far more than a second; new evidence (a test, a spike, a runtime probe) beats more opinions; resuming an existing consult with a delta packet costs a fraction of opening a new one. A consult's cost grows with the advisor's model and effort (stated in its description) and with packet size; `principal-advisor` is the slowest and costliest by far.
 
 ## Advisors
 
@@ -34,7 +34,7 @@ When an advisor shares your family, consult it only if clean context or its high
 
 ### Harness advisor tools
 
-Some harnesses also give you an advisor tool: a stronger model that reads your whole transcript and returns brief guidance, with no packet and no file access (for example, the Claude Code advisor). If you have none, skip this section. If you have one, it supplements the subagents; it does not replace them. It sees everything you have seen, but each call re-reads your whole transcript, uncached, at the advisor model's rates, so a call costs more the longer the task runs. It is also not a clean context: it shares your failed attempts and your framing, and it cannot verify code.
+Some harnesses also give you an advisor tool: a stronger model that reads your whole transcript and returns brief guidance, with no packet and no file access (for example, the Claude Code advisor). It sees everything you have seen, but each call re-reads your whole transcript, uncached, at the advisor model's rates, so a call costs more the longer the task runs. It is also not a clean context: it shares your failed attempts and your framing, and it cannot verify code.
 
 The spend policy decides these calls too. A call can pay where knowing your whole context is the point:
 
