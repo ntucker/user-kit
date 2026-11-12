@@ -54,11 +54,20 @@ SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", r
 SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
 SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
 ANY_MARKER = re.compile(r"<!-- /?(subagent-only|claude-skill)")
+# A plain (unquoted) YAML value cannot hold ": " or " #". Harnesses parse it leniently,
+# but GitHub and strict YAML parsers reject the whole frontmatter.
+UNSAFE_PLAIN_VALUE = re.compile(r"^(\w+):[ \t]+(?![\"'|>]).*(: | #)", re.M)
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
 OTHER_PROVIDER_MODEL = re.compile(r"(gemini|gpt|grok|composer)(-[\w.-]+)?")
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+
+def check_frontmatter(path: Path) -> None:
+    text = path.read_text()
+    if text.startswith("---\n") and (bad := UNSAFE_PLAIN_VALUE.search(text[: text.find("\n---", 3)])):
+        sys.exit(f"{path.relative_to(ROOT)}: quote the {bad.group(1)} value; unquoted it contains {bad.group(2)!r}")
 
 
 def to_claude(name: str, frontmatter: str) -> str | None:
@@ -94,8 +103,11 @@ def expected() -> dict[Path, tuple[bytes, bool]]:
     """Every generated file, as (contents, executable)."""
     files: dict[Path, tuple[bytes, bool]] = {}
     for source in mirrored_sources():
+        if source.name == "SKILL.md":
+            check_frontmatter(source)
         files[PLUGIN / source.relative_to(ROOT)] = (source.read_bytes(), is_executable(source))
     for source in sorted(SOURCE.glob("*.md")):
+        check_frontmatter(source)
         text = source.read_text()
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
