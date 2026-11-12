@@ -34,15 +34,7 @@ When an advisor shares your family, consult it only if clean context or its high
 
 ### Harness advisor tools
 
-Some harnesses also give you an advisor tool: a stronger model that reads your whole transcript and returns brief guidance, with no packet and no file access (for example, the Claude Code advisor). It sees everything you have seen, but each call re-reads your whole transcript, uncached, at the advisor model's rates, so a call costs more the longer the task runs. It is also not a clean context: it shares your failed attempts and your framing, and it cannot verify code.
-
-The spend policy decides these calls too. A call can pay where knowing your whole context is the point:
-
-- **Before sending a packet**, ask it what the packet leaves out or misstates; it has read what you read, so it can catch what you left out.
-- **Before acting on a decision step 2 did not list as a decision point**, when you are unsure it should have been one.
-- **Before declaring done**, after the end review, to check the result against the user's request.
-
-It does not stand in for a consult where clean context or file verification is the point: contract decisions (step 3), the escalation valve (step 5), and the end review (step 6). When it raises a design concern that meets step 2's bar, take that question to a subagent consult.
+Some harnesses give you an advisor tool (for example, the Claude Code advisor): a stronger model that reads your whole transcript, with no file access, and replies briefly. Each call re-reads that transcript uncached at the advisor model's rates, so calls cost more as the task grows; the spend policy decides them like any consult. Sharing your transcript makes it the reverse of a subagent consult: it knows everything you have seen, but it carries your failed attempts and framing and cannot verify code. Use it where whole-context knowledge is the point: before sending a packet, to find what the packet omits or misstates; before acting on something step 2 did not list, when unsure it is a decision point; and after the end review, to check the result against the user's request. Use a subagent consult where clean context or verification is the point: contract decisions (step 3), the escalation valve (step 5), the end review (step 6), and any design concern the advisor raises that meets step 2's bar.
 
 ## Workflow
 
