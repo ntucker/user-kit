@@ -1,8 +1,8 @@
 ---
 name: principal-advisor
-description: Principal-level advisor for the highest-blast-radius decisions - architecture, subtle concurrency/correctness, security-critical review, or designs where cheaper advisors disagreed. Slow and expensive - worth it when a wrong call's cost over the project's lifetime (how much will depend on the decision, how costly it is to reverse once depended upon, how wide a range of future demands it must hold under) clearly exceeds the consult; diff size is not the measure. Resume the existing agent for follow-ups instead of relaunching. Run blocking when the answer gates downstream work (usual for up-front architecture calls); background only when substantial work is genuinely independent of it. It cannot see your conversation - send a complete context packet. Runs on claude-fable-5-2 at xhigh effort.
+description: Principal-level advisor for the highest-blast-radius decisions - architecture, subtle concurrency/correctness, security-critical review, or designs where cheaper advisors disagreed. Slow and expensive - worth it when a wrong call's cost over the project's lifetime (how much will depend on the decision, how costly it is to reverse once depended upon, how wide a range of future demands it must hold under) clearly exceeds the consult; diff size is not the measure. Resume the existing agent for follow-ups instead of relaunching. Run blocking when the answer gates downstream work (usual for up-front architecture calls); background only when substantial work is genuinely independent of it. It cannot see your conversation - send a complete context packet. Runs on claude-fable-5-2 at high effort.
 model: claude-fable-5-2
-effort: xhigh
+effort: high
 disallowedTools: Write, Edit, NotebookEdit
 ---
 <!-- Generated from agents/principal-advisor.md by scripts/build_claude_plugin.py. Do not edit. -->
