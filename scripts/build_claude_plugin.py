@@ -40,6 +40,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.dont_write_bytecode = True  # keep __pycache__ out of the skill folder
+sys.path.insert(0, str(ROOT / "skills/skills-best-practices/scripts"))
+from validate_skill import parse_frontmatter  # noqa: E402  (stdlib-only; skills can't import from scripts/)
 SOURCE = ROOT / "agents"
 PLUGIN = ROOT / "claude"
 TARGET = PLUGIN / "agents"
@@ -54,10 +57,6 @@ SKILL_DESCRIPTION = re.compile(r"^<!-- claude-skill-description: (.+?) -->\n", r
 SKILL_ONLY = re.compile(r"^<!-- claude-skill\n(.*?)^-->\n", re.M | re.S)
 SUBAGENT_ONLY = re.compile(r"^<!-- subagent-only -->\n(.*?)^<!-- /subagent-only -->\n", re.M | re.S)
 ANY_MARKER = re.compile(r"<!-- /?(subagent-only|claude-skill)")
-# A plain (unquoted) YAML value cannot hold ": " or end in ":", and " #" starts a comment
-# that silently truncates it. Harnesses parse these leniently, but GitHub and strict YAML
-# parsers reject the whole frontmatter. skills-best-practices' validate_skill.py has the same rule.
-UNSAFE_PLAIN_VALUE = re.compile(r"^([\w-]+):[ \t]+(?![\"'|>]).*?(: | #|:$)", re.M)
 
 
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
@@ -65,10 +64,10 @@ OTHER_PROVIDER_MODEL = re.compile(r"(gemini|gpt|grok|composer)(-[\w.-]+)?")
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
 
-def check_frontmatter(path: Path) -> None:
-    text = path.read_text()
-    if text.startswith("---\n") and (bad := UNSAFE_PLAIN_VALUE.search(text[: text.find("\n---", 3)])):
-        sys.exit(f"{path.relative_to(ROOT)}: quote the {bad.group(1)} value; unquoted, {bad.group(2).strip()!r} breaks strict YAML")
+def check_frontmatter(path: Path, text: str) -> None:
+    """Fail on frontmatter that strict YAML parsers (and GitHub's rendering) reject."""
+    if (error := parse_frontmatter(text)[2]) is not None:
+        sys.exit(f"{path.relative_to(ROOT)}: frontmatter: {error}")
 
 
 def to_claude(name: str, frontmatter: str) -> str | None:
@@ -104,12 +103,13 @@ def expected() -> dict[Path, tuple[bytes, bool]]:
     """Every generated file, as (contents, executable)."""
     files: dict[Path, tuple[bytes, bool]] = {}
     for source in mirrored_sources():
+        data = source.read_bytes()
         if source.name == "SKILL.md":
-            check_frontmatter(source)
-        files[PLUGIN / source.relative_to(ROOT)] = (source.read_bytes(), is_executable(source))
+            check_frontmatter(source, data.decode())
+        files[PLUGIN / source.relative_to(ROOT)] = (data, is_executable(source))
     for source in sorted(SOURCE.glob("*.md")):
-        check_frontmatter(source)
         text = source.read_text()
+        check_frontmatter(source, text)
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
         header = HEADER.format(name=source.name)
