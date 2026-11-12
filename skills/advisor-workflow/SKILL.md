@@ -34,15 +34,15 @@ When an advisor shares your family, consult it only if clean context or its high
 
 ### Harness advisor tools
 
-Some harnesses also give you an advisor tool: a stronger model that reads your whole transcript and returns brief guidance, with no packet and no file access (for example, the Claude Code advisor). If you have none, skip this section. If you have one, it supplements the subagents; it does not replace them. It is cheap per call and sees everything you have seen, but it is not a clean context: it shares your failed attempts and your framing, and it cannot verify code.
+Some harnesses also give you an advisor tool: a stronger model that reads your whole transcript and returns brief guidance, with no packet and no file access (for example, the Claude Code advisor). If you have none, skip this section. If you have one, it supplements the subagents; it does not replace them. It sees everything you have seen, but each call re-reads your whole transcript, uncached, at the advisor model's rates, so a call costs more the longer the task runs. It is also not a clean context: it shares your failed attempts and your framing, and it cannot verify code.
 
-Use it where knowing your whole context is the point and a packet consult would not pay:
+The spend policy decides these calls too. A call can pay where knowing your whole context is the point:
 
-- **Before sending a packet**, ask it what the packet leaves out or misstates; it has read what you read. This is the cheapest guard against omission bias.
+- **Before sending a packet**, ask it what the packet leaves out or misstates; it has read what you read, so it can catch what you left out.
 - **Before acting on a decision step 2 did not list as a decision point**, when you are unsure it should have been one.
 - **Before declaring done**, after the end review, to check the result against the user's request.
 
-It does not count toward the spend policy's consults, and it does not stand in for a consult where clean context or file verification is the point: contract decisions (step 3), the escalation valve (step 5), and the end review (step 6). When it raises a design concern that meets step 2's bar, take that question to a subagent consult.
+It does not stand in for a consult where clean context or file verification is the point: contract decisions (step 3), the escalation valve (step 5), and the end review (step 6). When it raises a design concern that meets step 2's bar, take that question to a subagent consult.
 
 ## Workflow
 
