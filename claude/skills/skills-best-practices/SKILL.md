@@ -89,7 +89,7 @@ Write from real runs and artifacts: corrections you made, runbooks, schemas, rev
 
 1. Classify the failure: mis-triggering → description or lever; wrong behavior → ambiguous, missing, or misleading instructions; slow or wasteful runs → bloat or instructions that do not apply; drift → stale conventions.
 2. Snapshot before editing so the old version is the baseline (location and layout in [Output-quality evals](references/evals.md)). Preserve `name` and folder. Managed skills (built-ins, plugin caches) are overwritten on update, so copy into your own skills directory and give the copy a distinct name and sharpened description—two discovered skills with one name and description compete, and precedence is undocumented.
-3. Apply the principles above: fix the class, remove before adding, resolve conflicts, re-layer. If the skill has evals or checkable outputs, re-run against the snapshot; otherwise cold-read as in Auditing and have the user retry the failing prompt.
+3. Apply the principles above: fix the class, remove before adding, resolve conflicts, re-layer. When the body has grown into a long list of rules or edits have stalled, suggest the user run skill "conceptual-compression" on the body (it is user-invoked): it rewrites rules as the fewer general statements they follow from and checks that every case is still decided the same way. Keep the description out of it, since triggering depends on the specific phrasings compression removes. If the skill has evals or checkable outputs, re-run against the snapshot; otherwise cold-read as in Auditing and have the user retry the failing prompt.
 
 ### Auditing
 
