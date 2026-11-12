@@ -7,18 +7,18 @@ description: Cost-and-speed-optimized development workflow for an implementing m
 
 You are the implementer. **Objective: maximize quality; at a given quality level, minimize time-to-completion and cost.** Buy independent judgment from advisor subagents (see What a consult buys) whenever expected avoided rework (step 2) or defect risk exceeds the consult's cost and latency. Advisors consume the evidence you supply and return concise decisions (`frontend-design-advisor` also code); you own exploration, runtime validation, and all repository edits except what it builds inside its SCOPE (step 3).
 
-**Spend policy** (governs every consult decision): the first opinion on a question is worth far more than a second; new evidence (a test, a spike, a runtime probe) beats more opinions; resuming an existing consult with a delta packet costs a fraction of opening a new one.
+**Spend policy** (governs every consult decision): the first opinion on a question is worth far more than a second; new evidence (a test, a spike, a runtime probe) beats more opinions; resuming an existing consult with a delta packet costs a fraction of opening a new one. There is no per-task quota: consult when this policy says it pays, however many times that is, and not otherwise. A consult's cost grows with the advisor's model and effort (stated in its description) and with packet size; `principal-advisor` is the slowest and costliest by far.
 
 ## Advisors
 
-| Subagent | Where this workflow calls it | Default per task |
-|---|---|---|
-| `design-advisor` | decision points not claimed by principal (step 3); escalation valve (step 5) | ~2 consults; bundle coupled decisions into one packet |
-| `frontend-design-advisor` | the task's design-bearing visual work, in one packet (step 3); visual defects (step 5) | ~1 consult, resumed for follow-ups and defects |
-| `principal-advisor` | the dominating decision (step 3); valve when in its domain (step 5); unresolved critical findings (step 6) | ~1 consult, resumed for follow-ups |
-| `quality-reviewer` | end review of the diff (step 6) | 1, plus re-review after large fixes |
+| Subagent | Where this workflow calls it |
+|---|---|
+| `design-advisor` | decision points not claimed by principal (step 3), coupled decisions bundled into one packet; escalation valve (step 5) |
+| `frontend-design-advisor` | the task's design-bearing visual work, in one packet (step 3); visual defects (step 5), by resuming that consult |
+| `principal-advisor` | the dominating decision (step 3); valve when in its domain (step 5); unresolved critical findings (step 6); follow-ups by resuming |
+| `quality-reviewer` | end review of the diff (step 6); re-review after large fixes |
 
-What each advisor is good at, its model, its write access, and its launch mode are owned by its definition file, `agents/<name>.md` in the plugin that ships this skill (description shown in your subagent list); this table owns only where this workflow calls it. Defaults are calibration points; the spend policy decides when to exceed them.
+What each advisor is good at, its model, its write access, and its launch mode are owned by its definition file, `agents/<name>.md` in the plugin that ships this skill (description shown in your subagent list); this table owns only where this workflow calls it.
 
 ## What a consult buys
 
@@ -31,6 +31,10 @@ Three separable sources of value:
 Family is the provider (`claude-*` Anthropic, `gpt-*` OpenAI, grok xAI, composer Cursor); versions, codenames, effort suffixes, and a "Cursor" host prefix (as in "Cursor Grok") do not change it. Your system prompt names your model; each advisor's subagent description states its model and effort. If a description omits it, read `model:` from the definition (`.cursor/agents/<name>.md`, else this plugin's `agents/<name>.md`, else `~/.cursor/agents/`). Cursor substitutes a compatible model if your plan or admin blocks the configured one.
 
 When an advisor shares your family, consult it only if clean context or its higher effort is worth the cost: your context is long (deep into a task, many tool outputs) or holds failed attempts on this question, or the role is `quality-reviewer` — a fresh reader of your diff pays, though its "no issues" is weaker evidence because self-preference survives a fresh context. Otherwise perform the role yourself with its definition file as the checklist, or, if the other of `design-advisor`/`principal-advisor` is cross-family, send the question to it: step 3's exclusivity is then off, and because it answers outside its role, treat its answer as a second opinion to weigh, not the authority.
+
+### Harness advisor tools
+
+Some harnesses also give you an advisor tool that reads your whole transcript and returns brief guidance (for example, the Claude Code advisor). It needs no packet, but it is not a clean context: it sees your failed attempts and your framing, and it cannot read files or run code. Its timing is yours or the harness's to choose; this workflow neither requires nor counts its calls. It does not replace a consult where clean context or file verification is the point: contract decisions (step 3), the escalation valve (step 5), and the end review (step 6).
 
 ## Workflow
 
