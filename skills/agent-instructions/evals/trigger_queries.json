@@ -1,0 +1,46 @@
+[
+  {
+    "query": "our AGENTS.md is 700 lines now and half of it only matters when touching the billing service or the mobile app. how should I break it up?",
+    "should_trigger": true
+  },
+  {
+    "query": "should the 'always run migrations through scripts/migrate.sh' instruction live in CLAUDE.md, a skill, or a hook? it keeps getting ignored",
+    "should_trigger": true
+  },
+  {
+    "query": "I want a reviewer that runs in its own context with a fixed checklist. is that a subagent or a skill, and what goes where?",
+    "should_trigger": true
+  },
+  {
+    "query": "create a subagent that does security review of diffs, with its own system prompt",
+    "should_trigger": true
+  },
+  {
+    "query": "my agents/test-writer.md subagent keeps returning long essays instead of the checklist I asked for. fix the definition",
+    "should_trigger": true
+  },
+  {
+    "query": "write the brief I should hand a research subagent to compare three job queue libraries for us. it can't see this chat",
+    "should_trigger": true
+  },
+  {
+    "query": "our .cursor/rules/api.mdc is always applied and the agent still ignores half of it. can you rework it so it actually gets followed",
+    "should_trigger": true
+  },
+  {
+    "query": "write a README for the packages/react folder explaining the hooks",
+    "should_trigger": false
+  },
+  {
+    "query": "write a hook that runs prettier after every file edit the agent makes",
+    "should_trigger": false
+  },
+  {
+    "query": "draft release notes for v2.3 from CHANGELOG.md, users care most about the migration",
+    "should_trigger": false
+  },
+  {
+    "query": "the test in src/cache.test.ts started failing after the last merge, find out why and fix it",
+    "should_trigger": false
+  }
+]

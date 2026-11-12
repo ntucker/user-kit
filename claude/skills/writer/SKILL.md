@@ -1,6 +1,6 @@
 ---
 name: writer
-description: "Rules for writing and editing prose whose primary reader is a human and that is kept, published, or sent - documentation (including docstrings that become API reference), READMEs, guides, PR and issue descriptions, release notes, changelogs, design docs, reports, emails, announcements, and product, website, or UI copy. Use whenever a task produces or substantially revises such prose, even when the user never says \"write\". Not for conversational replies, text whose primary reader is a model or agent (AGENTS.md, CLAUDE.md, rules, skills, prompts, subagent definitions), machine-read text, or edits too small to need rules (a commit subject, a short code comment, a typo or link fix)."
+description: "Rules for writing and editing prose whose primary reader is a human and that is kept, published, or sent - documentation (including docstrings that become API reference), READMEs, guides, PR and issue descriptions, release notes, changelogs, design docs, reports, emails, announcements, and product, website, or UI copy. Use whenever a task produces or substantially revises such prose, even when the user never says \"write\". Not for conversational replies, text whose primary reader is a model or agent (AGENTS.md, CLAUDE.md, rules, skills, prompts, subagent definitions; skill \"agent-instructions\" covers those), machine-read text, or edits too small to need rules (a commit subject, a short code comment, a typo or link fix)."
 ---
 <!-- Generated from agents/writer.md by scripts/build_claude_plugin.py. Do not edit. -->
 
