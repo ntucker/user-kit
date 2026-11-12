@@ -78,7 +78,8 @@ def parse_frontmatter(text):
                 i += 1
                 if item.startswith("- "):
                     item = item[2:].strip()
-                    if _unsafe_plain(item):
+                    value = re.sub(r"^[\w-]+:(?: |$)", "", item)  # a "- key: value" item is a mapping
+                    if _unsafe_plain(value.strip()):
                         return None, body, "quote the %s list item; unquoted it breaks strict YAML parsers" % key
                     items.append(_unquote(item))
                 elif ":" in item:
