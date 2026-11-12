@@ -4,15 +4,45 @@ Personal skills and subagents for Cursor and Claude Code. This repository is the
 
 This repository is public. Do not put secrets in it.
 
-**Do not install this repo from the Cursor marketplace.** Why that freezes this desktop, and how cloud copies stay fresh, is in [`GOALS.md`](GOALS.md).
-
 Hooks and `/cut-cloud` stay in the separate `cursor-skills-sync` engine.
+
+## Install
+
+| Where you run it | How to install |
+| --- | --- |
+| Cursor desktop | [Clone into Cursor's local plugin folder](#cursor-desktop) |
+| Cursor cloud (Cloud Agents, Projects, Grok Bot) | [Import the newest dated snapshot](#cursor-cloud) |
+| Claude Code (terminal, desktop app, or the extension in Cursor or VS Code) | [Add the marketplace and install the plugin](#install-in-claude-code) |
+| Claude Code cloud sessions | [Run the same commands in the environment setup script](#claude-code-cloud-sessions) |
+
+## Install in Cursor
+
+> [!WARNING]
+> Do not import `ntucker/user-kit` from the Cursor marketplace or as a GitHub plugin. Cursor pins the commit of the first import, and no update or reinstall moves that pin. The pinned copy then overrides the local clone, so edits stop showing up. [`GOALS.md`](GOALS.md) has the details.
+
+### Cursor desktop
+
+1. Clone the repo into Cursor's local plugin folder. Keep the directory name `user-kit`.
+
+   ```sh
+   git clone https://github.com/ntucker/user-kit.git ~/.cursor/plugins/local/user-kit
+   ```
+
+2. Restart Cursor, or run **Developer: Reload Window**.
+
+Cursor reads the plugin from `.cursor-plugin/plugin.json` and loads skills from `skills/` and subagents from `agents/`. It loads them in place, so `git pull` in that folder is the update step.
+
+### Cursor cloud
+
+Cloud Agents, Projects, and Grok Bot cannot see `~/.cursor/plugins/local`. Install the newest dated snapshot repo instead, named `user-kit-YYYY-MM-DD` (or `user-kit-YYYY-MM-DD-HHMM`). `/cut-cloud` in `cursor-skills-sync` publishes a new snapshot. To pick up new commits, install the newer snapshot. Reinstalling an older one does not update it.
 
 ## Install in Claude Code
 
-The repo is a Claude Code plugin marketplace with one plugin, `user-kit`. Skills show up as `/user-kit:<skill>` and subagents as `user-kit:<agent>`.
+The repo is a Claude Code plugin marketplace named `user-kit`. Its main plugin is also `user-kit`, and each mod is a separate plugin. Skills show up as `/user-kit:<skill>` and subagents as `user-kit:<agent>`.
 
-### For everyone
+Install it once per machine. The Claude Code extension in Cursor or VS Code uses the same installation as the `claude` CLI.
+
+### From GitHub
 
 ```sh
 claude plugin marketplace add ntucker/user-kit
@@ -31,6 +61,23 @@ claude plugin update user-kit@user-kit
 ```
 
 or turn on **Enable auto-update** for `user-kit` in `/plugin` → **Marketplaces**.
+
+### Mods
+
+The marketplace also lists the mods in `mods/` (`pr-steward` and `work-queue`). Install one by name, for example:
+
+```sh
+claude plugin install work-queue@user-kit --scope user
+```
+
+### Claude Code cloud sessions
+
+A cloud session starts from a fresh container and cannot see your local checkout. Add these lines to the environment's setup script:
+
+```sh
+claude plugin marketplace add ntucker/user-kit
+claude plugin install user-kit@user-kit --scope user
+```
 
 ### Suggest it to everyone working in a repo
 
