@@ -27,6 +27,9 @@ BUNDLE_DIRS = ("scripts/", "references/", "assets/")
 FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,}).*?^[ \t]*\1[ \t]*$", re.S | re.M)
 LINK_RE = re.compile(r"\]\(\s*([^)\s#]+)(?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\s*\)")
 BLOCK_SCALAR_RE = re.compile(r"[>|](?:[+-]?\d?|\d?[+-]?)")
+# Strict YAML (GitHub, PyYAML) rejects a plain value holding ": " or ending in ":", and " #"
+# starts a comment that truncates it. Harnesses are lenient, so these only fail elsewhere.
+UNSAFE_PLAIN_RE = re.compile(r": | #|:$")
 TRIGGER_RE = re.compile(r"\b(Use|Apply|Invoke|Load|Trigger)\b[^.]{0,40}?\b(when|whenever|for|if|to)\b", re.I)
 
 def _unquote(value):
@@ -36,6 +39,10 @@ def _unquote(value):
     return value
 
 
+def _unsafe_plain(value):
+    return not value.startswith(("\"", "'", "{", "[")) and UNSAFE_PLAIN_RE.search(value)
+
+
 def parse_frontmatter(text):
     if not text.startswith("---"):
         return None, text, "missing frontmatter"
@@ -43,7 +50,7 @@ def parse_frontmatter(text):
     if len(parts) < 2:
         return None, text, "unterminated frontmatter"
     raw, body = parts[0][3:], parts[1].lstrip("\n")
-    data, lines, i, last_key = {}, raw.split("\n"), 0, None
+    data, lines, i, last_key, plain = {}, raw.split("\n"), 0, None, set()
     while i < len(lines):
         line = lines[i]
         i += 1
@@ -58,9 +65,7 @@ def parse_frontmatter(text):
             return None, body, "expected 'key: value' at: %r" % line
         key, _, value = line.partition(":")
         key, value, last_key = key.strip(), value.strip(), key.strip()
-        if not value.startswith(('"', "'")):
-            value = re.sub(r"\s+#.*$", "", value)
-        if BLOCK_SCALAR_RE.fullmatch(value):
+        if BLOCK_SCALAR_RE.fullmatch(re.sub(r"\s+#.*$", "", value)):
             block = []
             while i < len(lines) and (lines[i].startswith((" ", "\t")) or not lines[i].strip()):
                 block.append(lines[i].strip())
@@ -71,15 +76,26 @@ def parse_frontmatter(text):
             while i < len(lines) and (lines[i].startswith((" ", "\t")) or not lines[i].strip()):
                 item = lines[i].strip()
                 i += 1
+                if item.startswith("#"):
+                    continue
                 if item.startswith("- "):
-                    items.append(_unquote(item[2:].strip()))
+                    item = item[2:].strip()
+                    value = re.sub(r"^[\w-]+:(?: |$)", "", item)  # a "- key: value" item is a mapping
+                    if _unsafe_plain(value.strip()):
+                        return None, body, "quote the %s list item; unquoted it breaks strict YAML parsers" % key
+                    items.append(_unquote(item))
                 elif ":" in item:
                     k, _, v = item.partition(":")
+                    if _unsafe_plain(v.strip()):
+                        return None, body, "quote the %s.%s value; unquoted it breaks strict YAML parsers" % (key, k.strip())
                     nested[k.strip()] = _unquote(v.strip())
             data[key] = items if items else nested
         else:
             data[key] = value
-    for key, value in data.items():  # unquote after continuation lines are merged
+            plain.add(key)
+    for key, value in data.items():  # check and unquote after continuation lines are merged
+        if key in plain and _unsafe_plain(value):
+            return None, body, "quote the %s value; unquoted it breaks strict YAML parsers" % key
         if isinstance(value, str):
             data[key] = _unquote(value)
     return data, body, None

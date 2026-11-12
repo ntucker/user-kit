@@ -40,6 +40,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.dont_write_bytecode = True  # keep __pycache__ out of the skill folder
+sys.path.insert(0, str(ROOT / "skills/skills-best-practices/scripts"))
+from validate_skill import parse_frontmatter  # noqa: E402  (stdlib-only; skills can't import from scripts/)
 SOURCE = ROOT / "agents"
 PLUGIN = ROOT / "claude"
 TARGET = PLUGIN / "agents"
@@ -59,6 +62,12 @@ ANY_MARKER = re.compile(r"<!-- /?(subagent-only|claude-skill)")
 CLAUDE_MODEL = re.compile(r"claude-[\w.-]+|opus|sonnet|haiku|fable|inherit")
 OTHER_PROVIDER_MODEL = re.compile(r"(gemini|gpt|grok|composer)(-[\w.-]+)?")
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+
+def check_frontmatter(path: Path, text: str) -> None:
+    """Fail on frontmatter that strict YAML parsers (and GitHub's rendering) reject."""
+    if (error := parse_frontmatter(text)[2]) is not None:
+        sys.exit(f"{path.relative_to(ROOT)}: frontmatter: {error}")
 
 
 def to_claude(name: str, frontmatter: str) -> str | None:
@@ -94,9 +103,13 @@ def expected() -> dict[Path, tuple[bytes, bool]]:
     """Every generated file, as (contents, executable)."""
     files: dict[Path, tuple[bytes, bool]] = {}
     for source in mirrored_sources():
-        files[PLUGIN / source.relative_to(ROOT)] = (source.read_bytes(), is_executable(source))
+        data = source.read_bytes()
+        if source.name == "SKILL.md":
+            check_frontmatter(source, data.decode())
+        files[PLUGIN / source.relative_to(ROOT)] = (data, is_executable(source))
     for source in sorted(SOURCE.glob("*.md")):
         text = source.read_text()
+        check_frontmatter(source, text)
         frontmatter_end = text.index("\n---", 3) + len("\n---\n")
         frontmatter, body = text[:frontmatter_end], text[frontmatter_end:]
         header = HEADER.format(name=source.name)
