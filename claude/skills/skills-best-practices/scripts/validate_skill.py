@@ -65,7 +65,7 @@ def parse_frontmatter(text):
             return None, body, "expected 'key: value' at: %r" % line
         key, _, value = line.partition(":")
         key, value, last_key = key.strip(), value.strip(), key.strip()
-        if BLOCK_SCALAR_RE.fullmatch(value):
+        if BLOCK_SCALAR_RE.fullmatch(re.sub(r"\s+#.*$", "", value)):
             block = []
             while i < len(lines) and (lines[i].startswith((" ", "\t")) or not lines[i].strip()):
                 block.append(lines[i].strip())
@@ -76,6 +76,8 @@ def parse_frontmatter(text):
             while i < len(lines) and (lines[i].startswith((" ", "\t")) or not lines[i].strip()):
                 item = lines[i].strip()
                 i += 1
+                if item.startswith("#"):
+                    continue
                 if item.startswith("- "):
                     item = item[2:].strip()
                     value = re.sub(r"^[\w-]+:(?: |$)", "", item)  # a "- key: value" item is a mapping
