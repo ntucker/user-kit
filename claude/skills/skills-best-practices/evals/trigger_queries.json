@@ -87,5 +87,17 @@
   {
     "query": "delete the unused .cursor/skills/old-deploy folder and remove the one line in AGENTS.md that mentions it",
     "should_trigger": false
+  },
+  {
+    "query": "our AGENTS.md is 700 lines now and half of it only matters when touching the billing service or the mobile app. how should I break it up?",
+    "should_trigger": true
+  },
+  {
+    "query": "should the 'always run migrations through scripts/migrate.sh' instruction live in CLAUDE.md, a skill, or a hook? it keeps getting ignored",
+    "should_trigger": true
+  },
+  {
+    "query": "I want a reviewer that runs in its own context with a fixed checklist. is that a subagent or a skill, and what goes where?",
+    "should_trigger": true
   }
 ]
