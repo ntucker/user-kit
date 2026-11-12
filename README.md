@@ -4,7 +4,7 @@ Personal skills and subagents for Cursor and Claude Code. This repository is the
 
 This repository is public. Do not put secrets in it.
 
-Hooks and `/cut-cloud` stay in the separate `cursor-skills-sync` engine.
+Cursor hooks and `/cut-cloud` stay in the separate `cursor-skills-sync` engine.
 
 ## Install
 

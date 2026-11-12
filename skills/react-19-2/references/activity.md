@@ -129,7 +129,7 @@ function Video(props) {
 
 Same idea for `<audio>`, `<iframe>` (consider clearing `src` if it plays media), Web Audio nodes, `requestAnimationFrame` loops, and third-party widgets started in Effects (they are already torn down by the Effect cleanup).
 
-Pairing with transitions: wrap the mode change in `startTransition` when the reveal may suspend, so the current UI stays interactive. On 19.3+, that also enables `<ViewTransition>` enter/exit animations for the Activity (see the `react-19-3` skill).
+Pairing with transitions: wrap the mode change in `startTransition` when the reveal may suspend, so the current UI stays interactive. On 19.3+, that also enables `<ViewTransition>` enter/exit animations for the Activity (see skill "react-19-3").
 
 ## Troubleshooting
 

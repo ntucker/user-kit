@@ -9,7 +9,7 @@ Stable in 19.2: `<Activity>`, `useEffectEvent`, `cacheSignal`, React Performance
 
 ## Step 0: Confirm the version
 
-Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply skill "react-19-3" (`<ViewTransition>`, Fragment refs, `browser()`).
+Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React and ignores the project's `react` dependency (Pages Router uses the project's own). Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. On 19.3+ everything here still applies. If the task would also benefit from a 19.3 API (`<ViewTransition>`, Fragment refs, `browser()`), apply skill "react-19-3" too.
 
 ## Feature selection
 
@@ -55,7 +55,7 @@ Rules:
 5. Pre-rendering only fetches data read through Suspense (`use(promise)`, Suspense-enabled data libraries). Data fetched in `useEffect` does not run while hidden.
 6. Memory and DOM cost are real: every hidden tree keeps its DOM and fiber state. Bound the set (recent N items), and do not wrap huge lists item by item. Unmount when the content must truly go away (security, logout).
 7. 19.2-only gotchas, fixed in 19.3: `createPortal` content inside a hidden Activity stays visible (hide it yourself or unmount the portal); `<title>`/`<meta>`/`<link>` inside a hidden Activity are still hoisted into `<head>` (keep document metadata out of hidden trees); an error thrown while pre-rendering hidden content propagates to the nearest error boundary and can take down visible UI (wrap hidden content in its own error boundary).
-8. `Activity` is not exported from the `react` server entry point in 19.2 (added in 19.3), so import and render it in Client Components. On 19.3+, an `<Activity>` inside `<ViewTransition>` whose `mode` changes inside `startTransition` runs the boundary's `enter`/`exit` animation; see the `react-19-3` skill.
+8. `Activity` is not exported from the `react` server entry point in 19.2 (added in 19.3), so import and render it in Client Components. On 19.3+, an `<Activity>` inside `<ViewTransition>` whose `mode` changes inside `startTransition` runs the boundary's `enter`/`exit` animation; see skill "react-19-3".
 
 Patterns:
 

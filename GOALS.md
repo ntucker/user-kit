@@ -1,6 +1,6 @@
 # Goals
 
-This repo is the origin source of truth for personal Cursor skills and subagents. Desktop Cursor loads the clone at `~/.cursor/plugins/local/user-kit`. A separate engine, `cursor-skills-sync`, commits and pushes that clone and publishes cloud snapshots. Do not move that machinery into this repo, and do not add Cursor hooks here.
+This repo is the origin source of truth for personal skills and subagents, shared by Cursor and Claude Code. Desktop Cursor loads the clone at `~/.cursor/plugins/local/user-kit`. A separate engine, `cursor-skills-sync`, commits and pushes that clone and publishes cloud snapshots. Do not move that machinery into this repo, and do not add Cursor hooks here.
 
 These constraints are the contract for anyone editing this tree. A change that violates one breaks this desktop, the cloud snapshots, or the sync engine, even if the files still parse.
 
@@ -23,7 +23,7 @@ These constraints are the contract for anyone editing this tree. A change that v
 
 ## Claude Code
 
-9. **The Claude Code plugin is `claude/`, not the repo root.** `.claude-plugin/marketplace.json` points `user-kit` at `./claude`, so no Claude surface sees the Cursor `agents/` beside the Claude copies. Skills are shared as-is: `claude/skills/` mirrors `skills/`. `workflows/*.js` load as `user-kit:<name>` workflows, which are Claude-only.
+9. **The Claude Code plugin is `claude/`, not the repo root.** `.claude-plugin/marketplace.json` points `user-kit` at `./claude`, so no Claude surface sees the Cursor `agents/` beside the Claude copies. Skills are shared as-is: `claude/skills/` mirrors `skills/`, plus skills generated from agents that opt in (see the build script). `workflows/*.js` load as `user-kit:<name>` workflows, which are Claude-only.
 10. **Everything in `claude/` except `.claude-plugin/plugin.json` is generated.** Edit `agents/`, `skills/`, or `workflows/`, then run `python3 scripts/build_claude_plugin.py`. Never hand-edit the copies. CI regenerates them on `main` when a sync pushes source changes without them.
 
 Adding files for another tool is fine when it does not rename, move, or replace the Cursor manifest, `skills/`, or `agents/`.

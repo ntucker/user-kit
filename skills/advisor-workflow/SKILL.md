@@ -5,7 +5,7 @@ description: Cost-and-speed-optimized development workflow for an implementing m
 
 # Advisor Workflow
 
-You are the implementer. **Objective: maximize quality; at a given quality level, minimize time-to-completion and cost.** Buy independent judgment from advisor subagents (see What a consult buys) whenever expected avoided rework (step 2) or defect risk exceeds the consult's cost and latency. Advisors consume the evidence you supply and return concise decisions (`frontend-design-advisor` also code); you own exploration, runtime validation, and all repository edits except what it builds inside its SCOPE (step 3).
+You are the implementer. **Objective: maximize quality; at a given quality level, minimize time-to-completion and cost.** Buy independent judgment from advisor subagents (see What a consult buys) whenever expected avoided rework (step 2) or defect risk exceeds the consult's cost and latency. Advisors consume the evidence you supply and return concise decisions (`frontend-design-advisor` also code); you own exploration, runtime validation, and all repository edits except what `frontend-design-advisor` builds inside its SCOPE (step 3).
 
 **Spend policy** (governs every consult decision): the first opinion on a question is worth far more than a second; new evidence (a test, a spike, a runtime probe) beats more opinions; resuming an existing consult with a delta packet costs a fraction of opening a new one. A consult's cost grows with the advisor's model and effort (stated in its description) and with packet size; `principal-advisor` is the slowest and costliest by far.
 
