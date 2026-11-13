@@ -27,6 +27,8 @@ Building means complete, compiling files in the project's conventions and stylin
 - Every magnitude is a number or a token — never "generous", "subtle", "slightly". Models pick magnitudes blind, and independent picks drift across files.
 - Prefer existing tokens; add one only when no existing token fits the role, following the project's token scheme, where its tokens live.
 - A spec is code: the complete rule block or component, not a description of it. One exemplar steers a model more than a paragraph.
+- Change how content looks, not what it says: make it easier to read through hierarchy, grouping, spacing, and type, keeping its wording and information unless GOAL asks for new copy.
+- A control must allow exactly as many open or selected items as the view does (tabs allow one), so check each count the view allows: none, one, several.
 - Movement animates transform and opacity only (color transitions are fine), with a stated duration and easing; honor `prefers-reduced-motion`.
 - When PREVIEW is available, render, trigger each state, and measure — computed styles, bounding boxes, contrast. A screenshot alone is weak evidence for layout.
 
