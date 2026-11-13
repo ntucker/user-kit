@@ -24,7 +24,7 @@ Teach the class of task rather than the answer to one instance, since the text w
 
 ### Wording
 
-Two instructions that conflict, or only seem to, make the agent pick one arbitrarily or oscillate, so every case should have exactly one reading.
+Two instructions that conflict, or only seem to, make the agent pick one unpredictably or spend its effort reconciling them, so every case should have exactly one reading.
 
 - Resolve apparent conflicts while writing. Most are true statements about different regimes: name the variable that decides between them and write one conditioned rule instead of both. Check across files too, since an instructions file, a rule, and a skill that load together and disagree are one contradiction.
 - Use one term per concept, and one default with each alternative gated on the case that selects it. State only the current method, never a time-relative instruction ("before August use the old API"); collapse the old method under a deprecated heading.
@@ -54,7 +54,7 @@ Two instructions that conflict, or only seem to, make the agent pick one arbitra
 | As a delegated role with its own context | Subagent |
 | As a deterministic action on an agent event | Hook |
 
-A skill loads into the caller's context and shares everything it knows; a subagent starts fresh and returns only its report. Choose a subagent when a clean context, a different model, or restricted tools is the point, and a skill when the work needs the conversation. Moving content out of an always-applied file changes when it loads: keep what every turn needs, and move the rest into skills or path-scoped rules that say when they apply.
+A skill loads into the caller's context and shares everything it knows; a subagent starts fresh and returns only its report. Choose a subagent when a clean context, a different model, or restricted tools is the point, and a skill when the work needs the conversation. Text is followed most of the time, not every time: when a rule must hold on every run, enforce it with a hook or a permission rule and keep at most a pointer in the text. Moving content out of an always-applied file changes when it loads: keep what every turn needs, and move the rest into skills or path-scoped rules that say when they apply.
 
 ## By kind
 
@@ -65,9 +65,9 @@ Whatever decides when text is loaded or delegated to (a description, a rule's gl
 - The body, like any system prompt, is all a fresh context knows. In order: the role and what its product is; its inputs, naming the brief's fields, treated as evidence rather than ground truth, with named files read but no open-ended exploring; what it may change; its rules; and an output contract, a fixed structure the caller can act on, with a length cap and no preamble.
 - Set the model and write access explicitly in the harness's fields; omitted, they fall back to the default model and full write access.
 
-**Instructions files and rules.** An always-applied file or rule is read by every task every turn, so its bar is the highest: the commands to build and test, conventions the code does not show, traps, and pointers to where details live. Point to the owner of a topic rather than restating it, so one version stays true. A path-scoped or description-routed rule loads only when its globs or description match; keep its body to what applies whenever it loads.
+**Instructions files and rules.** An always-applied file or rule is read by every task every turn, so its bar is the highest: the commands to build and test, conventions the code does not show, traps, and pointers to where details live. Point to the owner of a topic rather than restating it, so one version stays true. A generated first draft, such as one from `/init`, mostly needs lines removed. A path-scoped or description-routed rule loads only when its globs or description match; keep its body to what applies whenever it loads.
 
-**Briefs and prompts for another agent.** The recipient of a brief (some agent definitions call it a context packet) knows only what you send: the goal, what you have ruled out, the files or sources to read, the constraints, the scope it may change, and the output you want back. For an independent judgment, send the evidence and not your conclusion or the answer you expect, since a brief that carries your view gets your view back; include a tentative pick only when the recipient's definition asks for one and tells it to discount it. Report a failed attempt as what was tried and the error it produced, not the draft that failed, so the recipient does not inherit its approach.
+**Briefs and prompts for another agent.** The recipient of a brief (some agent definitions call it a context packet) knows only what you send, beyond its own definition and any instructions files its harness loads: the goal, what you have ruled out, the files or sources to read, the constraints, the scope it may change, and the output you want back. For an independent judgment, send the evidence and not your conclusion or the answer you expect, since a brief that carries your view gets your view back; include a tentative pick only when the recipient's definition asks for one and tells it to discount it. Report a failed attempt as what was tried, the error it produced, and why it failed, not the draft that failed, so the recipient does not inherit its approach.
 
 ## Auditing
 
@@ -75,7 +75,7 @@ Read the text as its recipient would, cold: the routing text first, then the bod
 
 ## Verify
 
-Rereading cannot show what an agent does with the text, so run it on realistic tasks in fresh contexts, with and without the text or against the previous version, and compare the results with what you meant. One fresh agent on one task is the default check and needs no permission. Measured comparisons (several cases, baselines, repeated runs, saved eval files) cost real time and tokens, so offer them and run them only when the user opts in.
+Rereading cannot show what an agent does with the text, so run it on realistic tasks in fresh contexts, with and without the text or against the previous version, and compare the results with what you meant. One fresh agent on one task is the default check and needs no permission; it catches gross failures but cannot separate a small change from run-to-run variance. Measured comparisons (several cases, baselines, repeated runs, saved eval files) cost real time and tokens, so offer them and run them only when the user opts in.
 
 | Kind | How to verify |
 |---|---|
