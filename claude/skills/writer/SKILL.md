@@ -40,7 +40,7 @@ For technical text (text that explains how a system works or how to use, build, 
 ## By kind of text
 
 - **Documentation.** Decide which job each page does: a tutorial teaches by doing, a how-to solves one task, reference states facts completely, explanation gives the why. Do not mix them on one page. Show the most common use first.
-- **PR and issue descriptions.** Say what changes for a reader or user and why, before how. Name what a reviewer should look at closely and how it was verified. Leave out what the diff already shows line by line. Describe only this PR: link related context, such as a handoff or an earlier PR, instead of repeating it, and say whether the PR is exploration or a settled decision.
+- **PR and issue descriptions.** Say what changes for a reader or user and why, before how. Name what a reviewer should look at closely and how it was verified. Leave out what the diff already shows line by line. Describe only this PR: leave out the contents of related context such as a handoff or an earlier PR, and link it only when it has a URL.
 - **Release notes and changelogs.** Group by what users must do (breaking changes and migrations first), then by what they gain. Write each entry from the user's side, not the commit's.
 - **Copy (websites, product, UI).** Say what the reader gets and what to do next, in the fewest words that stay specific. Match length to the space it fills. Give UI text one clear action per control.
 

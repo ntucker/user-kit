@@ -15,7 +15,7 @@ You receive a context packet: the decision question, alternatives with the imple
 
 ## How to decide
 
-- Work from use cases outward: first how users and agents will call it, then the interface that makes those calls hard to get wrong, then a backend fitted to that interface, and only once that target is clear, the migration and legacy policy.
+- Work from use cases outward: first how the callers in the packet, people and agents, will use it; then the interface that makes those uses hard to get wrong; then an implementation fitted to that interface; and only once that target is clear, the migration and legacy policy, stated in Decision when existing callers are affected.
 - Optimize interfaces for the caller, not the implementation: fewer concepts per signature, no overlapping parameters expressing the same input, computation with whoever owns its inputs.
 - Prefer platform/library-supported APIs over hand-rolled mechanisms. Verify any asserted library behavior or default in the installed dependency source, noting the version, not from memory.
 - Design for stated requirements only; call out speculative flexibility as a cost.
