@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Measure how reliably a skill triggers, using the harness CLI in headless mode.
 
-For each query in a JSON file, runs the harness CLI several times in read-only plan mode
-and records whether the agent loaded the skill. A run is terminated the moment it triggers.
+For each query in a JSON file, runs the harness CLI several times and records whether the
+agent loaded the skill. A run is terminated the moment it triggers.
 
   cursor: `agent -p --output-format stream-json --mode plan --workspace <dir>`. Triggered
           when a readToolCall for the exact --skill-path appears.
-  claude: `claude -p --output-format stream-json --verbose --permission-mode plan`, run with
-          <dir> as the working directory. Triggered when the Skill tool is called with the
+  claude: `claude -p --output-format stream-json --verbose --permission-mode default
+          --disallowedTools Write Edit NotebookEdit`, run with <dir> as the working directory.
+          Plan mode is avoided because it suppresses skill loading; file edits are blocked
+          instead, and anything else needing approval is denied because no one can grant it. Triggered when the Skill tool is called with the
           skill's name or a Read of the exact --skill-path appears. The init event's skill
           list is checked first; a skill missing from it is not discoverable from <dir>.
 
@@ -51,8 +53,8 @@ def build_command(harness, query, workspace, model, effort):
     if harness == "cursor":
         return ["agent", "-p", "--output-format", "stream-json", "--trust", "--mode", "plan",
                 "--workspace", workspace, "--model", model, query]
-    cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "plan",
-           "--model", model]
+    cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "default",
+           "--disallowedTools", "Write", "Edit", "NotebookEdit", "--model", model]
     if effort:
         cmd += ["--effort", effort]
     return cmd + [query]

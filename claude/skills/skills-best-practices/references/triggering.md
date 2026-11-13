@@ -25,7 +25,7 @@ Keep queries multi-step; one-step tasks rarely trigger regardless of description
 
 ## Measuring
 
-`trigger_eval.py` runs each query through the harness CLI headless in plan mode (read-only, at some fidelity cost versus agent mode) and reports pass/fail per query. A run counts as triggered when the agent reads `<skill>/SKILL.md`, or in Claude Code also when it calls the Skill tool with the skill's name. `--harness` defaults to `auto`, which picks `claude` inside Claude Code and `cursor` (the `agent` CLI) otherwise:
+`trigger_eval.py` runs each query through the harness CLI headless and reports pass/fail per query. Claude Code runs in its normal permission mode with file edits blocked, because plan mode suppresses skill loading (in one comparison, 7 of 40 queries triggered only outside plan mode); Cursor runs in plan mode. Commands that the user's settings already allow still run, so point `--workspace` at a scratch copy when those include anything destructive. A run counts as triggered when the agent reads `<skill>/SKILL.md`, or in Claude Code also when it calls the Skill tool with the skill's name. `--harness` defaults to `auto`, which picks `claude` inside Claude Code and `cursor` (the `agent` CLI) otherwise:
 
 ```bash
 python3 <skill-dir>/scripts/trigger_eval.py --queries queries.json \
