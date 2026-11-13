@@ -7,6 +7,8 @@ description: Write, audit, and improve text whose reader is an agent - subagent 
 
 An agent acts on every sentence it reads, cannot ask what you meant, and reads your text beside the task, the conversation, and everything else loaded. The principles below hold for any text written for it; the sections after them cover what differs by kind. For a skill, apply them together with skill "skills-best-practices", which covers skill format, triggering, and evals.
 
+File formats, frontmatter fields, and locations belong to each harness, and its built-in authoring skills are the reference for them: in Cursor, skill "create-subagent", skill "create-rule", and skill "create-hook"; in Claude Code, the `/agents` command for subagents and skill "update-config" for hooks. They decide fields and locations; on how to write the text, follow this skill.
+
 ## Principles
 
 ### Earn every token
