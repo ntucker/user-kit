@@ -101,7 +101,7 @@ Stop when the next step's benefit is taste rather than a cheaper likely change. 
 
 Judge by the cost and risk of the next change, not by how many rules are broken. For each finding give the location, the problem in plain words, why it makes change costly or risky, a concrete fix, and a severity:
 
-- **must-fix:** will cause bugs or mislead (silenced errors, duplicated knowledge that will drift, names that lie, an owner mismatch forcing multi-place edits)
+- **critical:** will cause bugs or mislead (silenced errors, duplicated knowledge that will drift, names that lie, an owner mismatch forcing multi-place edits)
 - **should-fix:** materially slows understanding or change (mixed levels, a god function, mode flags, a shallow-abstraction pile)
 - **consider:** marginal or taste
 

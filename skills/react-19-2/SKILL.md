@@ -9,7 +9,7 @@ Stable in 19.2: `<Activity>`, `useEffectEvent`, `cacheSignal`, React Performance
 
 ## Step 0: Confirm the version
 
-Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React, which can differ from the project's `react` dependency. Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. If the project is on 19.3+, everything here still applies; additionally apply skill "react-19-3" (`<ViewTransition>`, Fragment refs, `browser()`).
+Confirm the React version that will actually run, not just what `package.json` requests; Next.js App Router bundles its own React and ignores the project's `react` dependency (Pages Router uses the project's own). Require `>= 19.2.0` (`19.2.0-canary-*` counts). If older, do not emit these APIs: say the feature needs 19.2, offer the upgrade, and use a pre-19.2 fallback only if the user declines. On 19.3+ everything here still applies. If the task would also benefit from a 19.3 API (`<ViewTransition>`, Fragment refs, `browser()`), apply skill "react-19-3" too.
 
 ## Feature selection
 
@@ -55,7 +55,7 @@ Rules:
 5. Pre-rendering only fetches data read through Suspense (`use(promise)`, Suspense-enabled data libraries). Data fetched in `useEffect` does not run while hidden.
 6. Memory and DOM cost are real: every hidden tree keeps its DOM and fiber state. Bound the set (recent N items), and do not wrap huge lists item by item. Unmount when the content must truly go away (security, logout).
 7. 19.2-only gotchas, fixed in 19.3: `createPortal` content inside a hidden Activity stays visible (hide it yourself or unmount the portal); `<title>`/`<meta>`/`<link>` inside a hidden Activity are still hoisted into `<head>` (keep document metadata out of hidden trees); an error thrown while pre-rendering hidden content propagates to the nearest error boundary and can take down visible UI (wrap hidden content in its own error boundary).
-8. `Activity` is not exported from the `react` server entry point in 19.2 (added in 19.3), so import and render it in Client Components. On 19.3+, an `<Activity>` inside `<ViewTransition>` whose `mode` changes inside `startTransition` runs the boundary's `enter`/`exit` animation; see the `react-19-3` skill.
+8. `Activity` is not exported from the `react` server entry point in 19.2 (added in 19.3), so import and render it in Client Components. On 19.3+, an `<Activity>` inside `<ViewTransition>` whose `mode` changes inside `startTransition` runs the boundary's `enter`/`exit` animation; see skill "react-19-3".
 
 Patterns:
 
@@ -150,41 +150,7 @@ For production-like numbers use the profiling build: alias `react-dom/client` to
 
 ## Partial pre-rendering
 
-```js
-import { prerender, resumeAndPrerender } from 'react-dom/static';
-import { resume } from 'react-dom/server';
-
-// Build time or first request: render the static shell, stop at request-specific data
-const controller = new AbortController();
-setTimeout(() => controller.abort(new Postponed()), 0);        // or a real timeout
-const { prelude, postponed } = await prerender(<App />, {
-  signal: controller.signal,
-  bootstrapScripts: ['/main.js'],
-  onError(e) { if (!(e instanceof Postponed)) console.error(e); },
-});
-await store(prelude, postponed);                                // postponed === null means fully rendered
-
-// Per request: send the cached prelude, then stream the rest
-const { html, postponed: saved } = await load(request);
-const stream = await resume(<App />, saved);
-// write html to the response first, then pipe stream after it
-
-// Or finish to static HTML for SSG
-const { prelude: fullHtml } = await resumeAndPrerender(<App />, saved);
-```
-
-Node stream variants: `prerenderToNodeStream` (`react-dom/static`), `resumeToPipeableStream` (`react-dom/server`, callbacks `onShellReady`/`onAllReady`/`onShellError`, returns `{ pipe, abort }`), `resumeAndPrerenderToNodeStream` (`react-dom/static`). Prefer Node streams in Node for speed and compression.
-
-Rules:
-
-- Everything request-specific must be inside a `<Suspense>` boundary and suspend during prerender (read cookies/session through a promise). Boundaries still pending at abort are emitted as fallbacks in `prelude` and recorded in `postponed`.
-- Render the same element (`<App />`) to `prerender` and `resume`; `resume` re-renders from the root and skips only components that fully finished prerendering.
-- `bootstrapScripts`, `bootstrapScriptContent`, `bootstrapModules`, `identifierPrefix` go to `prerender` only; `resume` inherits and does not accept them. `nonce` is not allowed on `prerender` (it would bake a per-request secret into the cache); pass it to `resume` only if `prerender` emitted no scripts.
-- `postponed` is JSON-serializable; persist it with the prelude (KV, S3, file). `null` means nothing to resume.
-- Abort with a sentinel (`class Postponed extends Error {}`) and filter it in `onError` so intentional postponement is not logged as a failure.
-- Hydrate the whole document with `hydrateRoot(document, <App />)` as usual.
-
-End-to-end flow, storage, timeouts, and troubleshooting: [Partial pre-rendering reference](references/partial-prerendering.md).
+Frameworks such as Next.js do this for you; the APIs matter when building a custom server, static generator, or edge runtime. `prerender` (`react-dom/static`) renders the static shell until aborted and returns `{ prelude, postponed }`; per request, send the cached `prelude` and `resume` (`react-dom/server`) the same element with the saved `postponed` to stream the request-specific rest, or `resumeAndPrerender` to finish it as static HTML. Node stream variants exist for each step. Read [Partial pre-rendering reference](references/partial-prerendering.md) before writing any of it: which options go to `prerender` only, why `nonce` never does, the abort sentinel, Suspense placement, and the end-to-end flow.
 
 ## Other 19.2 behavior to rely on
 
@@ -218,7 +184,7 @@ End-to-end flow, storage, timeouts, and troubleshooting: [Partial pre-rendering 
 
 ## References
 
-- [Activity reference](references/activity.md): lifecycle table, SSR/hydration behavior, pre-render mechanics, patterns (tabs, routers, master-detail, wizards, modals, media), memory guidance, troubleshooting.
-- [Effect Events reference](references/effect-events.md): reactive vs non-reactive decision, migration recipes, custom Hook patterns, every lint/runtime error and its fix.
-- [Partial pre-rendering reference](references/partial-prerendering.md): full API matrix (Web and Node streams), storage/serving flow, abort sentinel, Suspense placement, caveats.
+- Read [Activity reference](references/activity.md) when using `<Activity>` beyond a simple toggle or when it misbehaves: lifecycle table, SSR/hydration behavior, pre-render mechanics, patterns (tabs, routers, master-detail, wizards, modals, media), memory guidance, troubleshooting.
+- Read [Effect Events reference](references/effect-events.md) when deciding what belongs in an Effect Event or fixing a lint or runtime error: reactive vs non-reactive decision, migration recipes, custom Hook patterns, every lint/runtime error and its fix.
+- Read [Partial pre-rendering reference](references/partial-prerendering.md) before writing any prerender or resume code: full API matrix (Web and Node streams), storage/serving flow, abort sentinel, Suspense placement, caveats.
 - Upstream: [React 19.2 post](https://react.dev/blog/2025/10/01/react-19-2), [`<Activity>`](https://react.dev/reference/react/Activity), [`useEffectEvent`](https://react.dev/reference/react/useEffectEvent), [`cacheSignal`](https://react.dev/reference/react/cacheSignal), [Performance Tracks](https://react.dev/reference/dev-tools/react-performance-tracks), [`prerender`](https://react.dev/reference/react-dom/static/prerender), [`resume`](https://react.dev/reference/react-dom/server/resume), [`eslint-plugin-react-hooks`](https://react.dev/reference/eslint-plugin-react-hooks).

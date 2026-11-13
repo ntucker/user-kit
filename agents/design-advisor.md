@@ -1,6 +1,6 @@
 ---
 name: design-advisor
-description: "Design consultant for API, schema, and data-flow decisions (visual design: frontend-design-advisor). Receives a context packet (question, alternatives, constraints, signatures, raw code excerpts) and returns a decision with rationale, risks, and proving test cases. Use proactively before finalizing any new or changed public signature, schema, store shape, or cross-module contract. Runs on claude-opus-5-5 at high effort."
+description: "Design consultant for API, schema, and data-flow decisions (visual design: frontend-design-advisor). Receives a context packet (question, alternatives, constraints, signatures, raw code excerpts) and returns a decision with rationale, risks, and proving test cases. Use proactively before finalizing any new or changed public signature, schema, store shape, or cross-module contract. It cannot see your conversation - send a complete context packet. Run blocking when the decision gates the code you write next, which is usual. Runs on claude-opus-5-5 at high effort."
 model: claude-opus-5-5[effort=high]
 readonly: true
 ---
