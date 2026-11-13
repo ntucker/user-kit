@@ -1,6 +1,6 @@
 ---
 name: skills-best-practices
-description: Write, audit, and improve Agent Skills (SKILL.md folders) in any agent harness, including format and frontmatter. Use whenever the user wants to create a skill, edit or refactor one, review or audit skill quality, fix a skill that is not being picked up or triggers too often, improve a skill's description, run evals or benchmark a skill to test whether it actually helps, split or consolidate skills, convert a rule or command into a skill, turn a conversation or repeated workflow into one, or wants the agent to reliably follow some procedure, convention, or check across sessions without being reminded - even when they never say "skill", or only point at a .cursor/skills, .claude/skills, .agents/skills, or ~/.cursor/skills path. Also use when explaining how skills work or should be written, or deciding whether guidance should become a skill. Not for subagents, rules, or instruction files, which skill "agent-instructions" covers.
+description: Write, audit, and improve Agent Skills (SKILL.md folders) in any agent harness, including format and frontmatter. Use whenever the user wants to create a skill, edit or refactor one, review or audit skill quality, fix a skill that is not being picked up or triggers too often, improve a skill's description, run evals or benchmark a skill to test whether it actually helps, split or consolidate skills, convert a rule or command into a skill, turn a conversation or repeated workflow into one, or wants the agent to reliably follow some procedure, convention, or check across sessions without being reminded - even when they never say "skill", or only point at a .cursor/skills, .claude/skills, .agents/skills, or ~/.cursor/skills path. Also use when explaining how skills work or should be written, or turning existing guidance into a skill. Not for subagents, rules, or instructions files, which skill "agent-instructions" covers.
 license: Apache-2.0
 metadata:
   sources: agentskills.io spec and guides; anthropics/skills skill-creator
@@ -8,7 +8,7 @@ metadata:
 
 # Skills best practices
 
-This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Read skill "agent-instructions" with it, since its principles (earn every token, generalize, remove contradictions, explain why, prefer gotchas, ground in evidence) apply to skills as to any text an agent reads, and this skill does not repeat them. For the harness's own frontmatter fields and file layout, its built-in skill-authoring skill is the reference (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code); where one disagrees with this skill, the gotchas at the end decide. Its Writing workflow, wording rules, and body patterns apply to drafting a skill too. Read [Skill format](references/format.md) when creating a skill or checking frontmatter or naming against the open spec.
+This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Read skill "agent-instructions" with it: its principles, Writing and Editing workflows, wording rules, and body patterns apply to skills as to any text an agent reads, and this skill does not repeat them. For frontmatter fields and file layout, the harness's built-in skill-authoring skill is the reference (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code); it decides fields and locations, and on how to write and test a skill, follow this skill and skill "agent-instructions". The gotchas at the end resolve the specific disagreements found so far. Read [Skill format](references/format.md) when creating a skill or checking frontmatter or naming against the open spec.
 
 ## Why the rules exist
 
@@ -22,7 +22,7 @@ A skill transfers expertise the agent lacks. Its content competes for attention 
 - The body holds what every activation needs. References hold what only some activations need, each introduced by the condition that calls for it: "Read [API errors](references/<topic>.md) if the response is non-200." A bare "see references/ for details" loads never or always.
 - Gotchas stay in the body even when long, because the agent cannot know to load a file for a trap it does not know exists.
 - One level deep: `SKILL.md` links to references; references do not chain onward. Split large reference sets by variant (one file per framework or platform) so a run reads one; give long references a table of contents.
-- Point at the next layer unambiguously. Link bundled documents as `[Concept Name](references/<file>.md)` from the skill root, so the agent gets a readable name and a resolvable path. Invoke scripts as `python3 <skill-dir>/scripts/x.py`, where `<skill-dir>` is the folder containing the `SKILL.md` being followed and the consuming agent substitutes it; the shell runs from the workspace, so the base must be explicit. Name other skills as skill "skill-name" (the literal word skill, then the name in quotes), never by path or slash command; paths differ per machine and slash syntax means "invoke", not "consult".
+- Point at the next layer unambiguously. Link bundled documents as `[Concept Name](references/<file>.md)` from the skill root, so the agent gets a readable name and a resolvable path. Invoke scripts as `python3 <skill-dir>/scripts/x.py`, where `<skill-dir>` is the folder containing the `SKILL.md` being followed and the consuming agent substitutes it; the shell runs from the workspace, so the base must be explicit. Name other skills as skill "skill-name", as skill "agent-instructions" says.
 
 ### Choose the trigger lever
 
@@ -44,21 +44,22 @@ Like a function: one job that composes with other skills. Too narrow forces seve
 ### Creating
 
 1. Gather as in "Writing" in skill "agent-instructions". For a skill, also settle its dependencies and whether it is personal or project-scoped.
-2. Confirm a skill is the right container ("Where guidance belongs" in skill "agent-instructions"), then choose the lever from the table above, which sets how much the description must do. Converting an existing rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill, slash command → explicit-only. A skill's contents must match what its description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
+2. Confirm a skill is the right container ("Where guidance belongs" in skill "agent-instructions"), then choose the lever from the table above, which sets how much the description must do. Converting an existing rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill; path-scoped rule → skill with `paths`, unless a few lines that stay a rule do the job; slash command → explicit-only. An always-applied rule stays a rule unless only some tasks need it. A skill's contents must match what its description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
 3. Draft the body as in "Writing" in skill "agent-instructions" and the frontmatter with [Skill format](references/format.md), layering per the principles above. Then read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
-4. Offer testing per Verify with execution and let the user decide: no eval artifacts until they opt in, and cases shown to them before any run. Explain jargon such as "eval" or "assertion" unless the user shows familiarity.
+4. Offer measured testing per Verify with execution and let the user decide: no eval artifacts until they opt in, and cases shown to them before any run. Explain jargon such as "eval" or "assertion" unless the user shows familiarity.
 
-### Improving
+### Editing
 
-1. Classify the failure: mis-triggering → description or lever; wrong behavior → ambiguous, missing, or misleading instructions; slow or wasteful runs → bloat or instructions that do not apply; drift → stale conventions.
-2. Snapshot before editing so the old version is the baseline (location and layout in [Output-quality evals](references/evals.md)). Preserve `name` and folder. Managed skills (built-ins, plugin caches) are overwritten on update, so copy into your own skills directory and give the copy a distinct name and sharpened description—two discovered skills with one name and description compete, and precedence is undocumented.
-3. Apply the principles here and in skill "agent-instructions": fix the class, remove before adding, resolve conflicts, re-layer. If the skill has evals or checkable outputs, re-run against the snapshot; otherwise cold-read as in Auditing and have the user retry the failing prompt.
+Follow "Editing" in skill "agent-instructions", with these additions at its steps:
+
+- **Find what is wrong (step 1):** mis-triggering points at the description or the trigger lever (table above); content the agent reads too late, or never, points at re-layering.
+- **Keep the baseline (step 2):** snapshot the skill before the first change, laid out as in [Output-quality evals](references/evals.md). If the skill is your own, keep its `name` and folder. If it is managed (built-ins, plugin caches), updates overwrite it, so copy it into your own skills directory under a distinct name with a sharpened description; two discovered skills with one name and description compete, and precedence is undocumented.
+- **Re-check (step 4):** if the skill has evals or checkable outputs, offer to re-run them against the snapshot under the same gate as Creating step 4; otherwise cold-read as in Auditing and have the user retry the failing prompt.
 
 ### Auditing
 
 Audit as in skill "agent-instructions" (description first, then body, then references only where the body sends you), check the principles here as well, and add these skill-specific checks to the report:
 
-- Would the description fire on realistic indirect prompts and stay quiet on near-misses that share its keywords?
 - Do bundled scripts meet [Scripts and commands](references/scripts.md)?
 - Does `python3 <skill-dir>/scripts/validate_skill.py <target>` pass?
 
@@ -81,5 +82,5 @@ Stop when feedback is empty, the user is satisfied, or gains stop justifying cos
 - **"Keep under 500 lines" vs. "go longer if needed".** The number is an attention heuristic, not a quota or a wall. Every line earns its place; when legitimately longer, split by when-needed.
 - **Cursor's built-in skill "create-skill" says "Default `disable-model-invocation: true` … omit it only when the agent should auto-invoke from ambient context" vs. the platform's auto-invoke default.** The built-in states a blanket policy; this skill instead chooses the lever from the table above, because explicit-only forfeits the main value of a skill—help on tasks the user would not think to ask for—and is the right choice only when the user always initiates the procedure.
 - **Claude Code's skill "skill-creator" runs its description-optimization loop on "the model powering this session" vs. the eval-model rule above.** Its choice tests fidelity to one user's setup; the eval-model rule tests whether the skill works across the models users run. Use the eval-model rule unless the user asks for fidelity, and pass that model to skill-creator's scripts if you use them.
-- **Cursor's skill "migrate-to-skills" copies a rule or command body verbatim vs. this skill's Improving workflow.** They are separate steps: migrate verbatim first so the conversion is reviewable on its own, then improve the new skill as a second change.
+- **Cursor's skill "migrate-to-skills" copies a rule or command body verbatim vs. this skill's Editing workflow.** They are separate steps: migrate verbatim first so the conversion is reviewable on its own, then improve the new skill as a second change.
 - **The docs invoke scripts as `python scripts/<x>.py` vs. this skill's `python3 <skill-dir>/scripts/<x>.py`.** The docs' relative form assumes the running agent knows the skill folder; the placeholder makes that explicit for an agent whose shell runs from the workspace.

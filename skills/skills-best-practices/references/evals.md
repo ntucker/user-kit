@@ -54,6 +54,8 @@ Execute this task.
 
 Baseline: identical prompt with the first bullet replaced by "Do not read any skill files" (saving to `without_skill/`) or by "Read only `<workspace>/skill-snapshot/SKILL.md`; do not read `<name>` from your skills list" (saving to `old_skill/`). The subagent can still see the live skill in its skills list; the instruction is the only barrier, so check its transcript for a read of the live path.
 
+When the skill depends on another skill (as skill "skills-best-practices" depends on skill "agent-instructions"), snapshot each dependency with it and name in both arms which copy of each to read. Otherwise the old arm reads the old skill beside the new dependency, and content moved between the two shows up as a change in neither.
+
 Cost and duration depend on the harness:
 
 | Harness | Subagent result | CLI run with token counts |
@@ -105,6 +107,6 @@ Present each case's prompt and outputs to the user and collect feedback per case
 
 ## 7. Iterate
 
-Three signals feed the revision: failed assertions (specific gaps), human feedback (approach or structure), transcripts (why). Classify and revise per the Improving workflow and Principles of skill "skills-best-practices", then re-run the changed skill into `iteration-N+1/` and review again. Reuse baseline artifacts while prompt, model, snapshot, environment, and fixtures are unchanged; rerun them only when an input changes or when intentionally measuring variance. Once the set passes consistently, add cases before declaring done—a skill tuned on three prompts has been shown to work on three prompts.
+Three signals feed the revision: failed assertions (specific gaps), human feedback (approach or structure), transcripts (why). Revise per "Editing" in skill "agent-instructions" and the Editing additions in skill "skills-best-practices", then re-run the changed skill into `iteration-N+1/` and review again. Reuse baseline artifacts while prompt, model, snapshot, environment, and fixtures are unchanged; rerun them only when an input changes or when intentionally measuring variance. Once the set passes consistently, add cases before declaring done—a skill tuned on three prompts has been shown to work on three prompts.
 
 For "is v2 really better than v1", run a blind comparison: give a subagent both outputs labeled A/B without saying which version produced which, have it build a task-specific rubric (correctness, completeness, organization, usability), score both, and pick a winner—ties only when genuinely equivalent; if both fail, the less-bad one. Then unblind and read both transcripts, separating causal differences (an instruction the transcript shows being followed) from incidental ones, and propose only changes that would help the other cases too.

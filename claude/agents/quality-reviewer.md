@@ -1,6 +1,6 @@
 ---
 name: quality-reviewer
-description: Diff-scoped quality reviewer that catches what implementers and simplify passes miss - resource lifecycle gaps, bloated API surfaces, cross-cutting duplication, dead code, and config restating library defaults. Use proactively after completing any non-trivial implementation, before committing. Reviews only the diff plus necessary surrounding context; returns prioritized findings with equivalence proofs for any proposed merge. Runs on claude-opus-5-5 at high effort.
+description: Diff-scoped quality reviewer that catches what implementers and simplify passes miss - resource lifecycle gaps, bloated API surfaces, cross-cutting duplication, dead code, and config restating library defaults. Use proactively after completing any non-trivial implementation, before committing. Reviews only the diff plus necessary surrounding context; returns prioritized findings with equivalence proofs for any proposed merge. It cannot see your conversation - state the review scope (base revision, changes, generated outputs). Launch it once the diff is final; it can run in the background while you do work that leaves the diff unchanged, and its findings must be applied before committing. Runs on claude-opus-5-5 at high effort.
 model: claude-opus-5-5
 effort: high
 disallowedTools: Write, Edit, NotebookEdit
