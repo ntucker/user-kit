@@ -80,7 +80,8 @@ Rereading cannot show what an agent does with the text, so run it on realistic t
 | Kind | How to verify |
 |---|---|
 | Skill | Use the trigger and output evals in skill "skills-best-practices" |
-| Subagent or system prompt | Give it a realistic brief and check that its reply follows the output contract. Then run tasks in a fresh session where it is available, and check that the caller delegates when it should and that the brief it sends is enough; skill trigger evals do not measure delegation |
+| Subagent | Give it a realistic brief and check that its reply follows the output contract. Then run tasks in a fresh session where it is available, and check that the caller delegates when it should and that the brief it sends is enough; skill trigger evals do not measure delegation |
+| System prompt | Run it on realistic inputs and check its replies against its rules and output contract |
 | Instructions file or rule | Run a few ordinary tasks in fresh sessions and read the transcripts for instructions followed, ignored, or misapplied |
 | Brief or prompt | Send it to a fresh agent; anything it asks about or guesses at is missing from the brief |
 

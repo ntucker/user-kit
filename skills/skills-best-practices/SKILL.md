@@ -8,7 +8,7 @@ metadata:
 
 # Skills best practices
 
-This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Read skill "agent-instructions" with it; its principles, Writing and Editing workflows, wording rules, and body patterns apply to skills as to any text an agent reads, and are not repeated here. The harness's built-in skill-authoring skill (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code) decides frontmatter fields and file layout; how to write and test a skill follows this skill and skill "agent-instructions", and the gotchas at the end settle the specific disagreements found so far.
+This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Skill "agent-instructions" holds the full guidance for writing, editing, auditing, and verifying any text an agent reads, skills included; read it with this one. The steps below carry the essentials so they work even when it is not loaded. The harness's built-in skill-authoring skill (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code) decides frontmatter fields and file layout; how to write and test a skill follows this skill and skill "agent-instructions", and the gotchas at the end settle the specific disagreements found so far.
 
 ## Principles
 
@@ -40,9 +40,9 @@ Like a function: one job that composes with other skills. Too narrow makes sever
 
 ### Creating
 
-1. Gather as in "Writing" in skill "agent-instructions", and also settle the skill's dependencies and whether it is personal or project-scoped.
+1. Gather before drafting: mine the conversation for the purpose, when the skill applies, what the agent got wrong or the user corrected, input and output formats, and project facts, and ask the user only about the gaps. Keep the user's wording where it is valid. Settle the skill's dependencies and whether it is personal or project-scoped.
 2. Confirm a skill is the right container ("Where guidance belongs" in skill "agent-instructions"), then choose the lever, which sets how much the description must do. A converted rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill; path-scoped rule → skill with `paths`, unless a few lines that stay a rule do the job; slash command → explicit-only; an always-applied rule stays a rule unless only some tasks need it. The contents must match what the description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
-3. Draft the body as in "Writing" in skill "agent-instructions" and the frontmatter with [Skill format](references/format.md), layered as above. Read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
+3. Draft the frontmatter with [Skill format](references/format.md) and the body layered as above. Include only what the agent would get wrong without it, and shape it by use: a decision table for routing, a template for output, two or three varied examples for style, a checklist for gated steps. Write conditions before actions, say what to do rather than only what to avoid, and give a reason for every rigid rule; "Writing" in skill "agent-instructions" has the rest. Read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
 4. Offer measured testing per Verify with execution and let the user decide: no eval artifacts until they opt in, and cases shown to them before any run. Explain jargon such as "eval" or "assertion" unless the user shows familiarity.
 
 ### Editing
@@ -51,7 +51,7 @@ Follow "Editing" in skill "agent-instructions", adding at its steps:
 
 - **Step 1:** mis-triggering points at the description or the lever; content the agent reads too late, or never, points at re-layering.
 - **Step 2:** snapshot the skill before the first change, laid out as in [Output-quality evals](references/evals.md). A skill of your own keeps its `name` and folder. A managed one (built-ins, plugin caches) is overwritten on update, so copy it into your own skills directory under a distinct name with a sharpened description; two discovered skills with one name and description compete, and precedence is undocumented.
-- **Step 4:** if the skill has evals or checkable outputs, offer to re-run them against the snapshot under Creating step 4's gate; otherwise cold-read as in Auditing and have the user retry the failing prompt.
+- **Step 4:** run the failing prompt again on the edited skill, as the default check; if the skill has evals, offer to re-run them against the snapshot under Creating step 4's gate.
 
 ### Auditing
 
