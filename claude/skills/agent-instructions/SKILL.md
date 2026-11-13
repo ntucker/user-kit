@@ -24,7 +24,7 @@ Teach the class of task rather than the answer to one instance, since the text w
 
 ### Wording
 
-Two instructions that conflict, or only seem to, make the agent pick one unpredictably or spend its effort reconciling them, so every case should have exactly one reading.
+Two instructions that conflict, or only seem to, make the agent pick one arbitrarily, oscillate, or spend its effort reconciling them, so every case should have exactly one reading.
 
 - Resolve apparent conflicts while writing. Most are true statements about different regimes: name the variable that decides between them and write one conditioned rule instead of both. Check across files too, since an instructions file, a rule, and a skill that load together and disagree are one contradiction.
 - Use one term per concept, and one default with each alternative gated on the case that selects it. State only the current method, never a time-relative instruction ("before August use the old API"); collapse the old method under a deprecated heading.
