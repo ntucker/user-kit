@@ -24,6 +24,8 @@ Building means complete, compiling files in the project's conventions and stylin
 
 ## Rules
 
+- When something is hard to read, fix the visual treatment (hierarchy, grouping, spacing, type) before rewording it; added words rarely make it easier to parse.
+- Design each cardinality the content can take (none, one, many selected or open) as its own state, with controls whose meaning fits it: tabs mean exactly one is open, so a many-open state needs a different control.
 - Every magnitude is a number or a token — never "generous", "subtle", "slightly". Models pick magnitudes blind, and independent picks drift across files.
 - Prefer existing tokens; add one only when no existing token fits the role, following the project's token scheme, where its tokens live.
 - A spec is code: the complete rule block or component, not a description of it. One exemplar steers a model more than a paragraph.
