@@ -7,12 +7,13 @@ agent loaded the skill. A run is terminated the moment it triggers.
   cursor: `agent -p --output-format stream-json --mode plan --workspace <dir>`. Triggered
           when a readToolCall for the exact --skill-path appears.
   claude: `claude -p --output-format stream-json --verbose --permission-mode default
-          --disallowedTools Write Edit NotebookEdit --strict-mcp-config`, run with <dir> as
-          the working directory. Plan mode and a read-only tool set both distort skill
-          loading, so the default tools stay and edits are blocked; a command the user's
-          settings do not allow is denied, since no one can approve it. Triggered when the Skill tool is called with the skill's name or a Read
-          of the exact --skill-path appears. The init event's skill list is checked first;
-          a skill missing from it is not discoverable from <dir>.
+          --disallowedTools Write Edit NotebookEdit --strict-mcp-config`, run with <dir>
+          as the working directory. Plan mode and a read-only tool set both distort skill
+          loading, so the other default tools stay and edits are blocked; a command the
+          user's settings do not allow is denied, since no one can approve it. Triggered
+          when the Skill tool is called with the skill's name or a Read of the exact
+          --skill-path appears. The init event's skill list is checked first; a skill
+          missing from it is not discoverable from <dir>.
 
 --harness auto picks claude inside a Claude Code session (CLAUDECODE=1), else cursor.
 Requires the chosen CLI on PATH and logged in. Python 3.8+, stdlib only.
