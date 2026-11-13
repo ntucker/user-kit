@@ -1,6 +1,6 @@
 # Body patterns
 
-Reusable shapes for skill content. Pick the one that matches how the task fails without guidance; most skills use two or three.
+Reusable shapes for instructions an agent follows: skill bodies, subagent prompts, rules, and briefs. Pick the one that matches how the task fails without guidance; most texts use two or three.
 
 ## Decision table (routing)
 
@@ -15,7 +15,7 @@ Condition → action, branches mutually exclusive, default first, each leaf poin
 
 ## Template (output format)
 
-Agents pattern-match structures better than they follow prose descriptions of format. Inline when short; in `assets/` when long or only sometimes needed.
+Agents pattern-match structures better than they follow prose descriptions of format. Inline when short; in a separate file (a skill's `assets/`) when long or only sometimes needed.
 
 ```markdown
 Use this structure, adapting sections to the analysis:

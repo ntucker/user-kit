@@ -8,7 +8,7 @@ metadata:
 
 # Skills best practices
 
-This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Read skill "agent-instructions" with it, since its principles (earn every token, generalize, remove contradictions, explain why, prefer gotchas, ground in evidence) apply to skills as to any text an agent reads, and this skill does not repeat them. For the harness's own frontmatter fields and file layout, its built-in skill-authoring skill is the reference (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code); where one disagrees with this skill, the gotchas at the end decide. Read [Skill format](references/format.md) when creating a skill or checking frontmatter or naming against the open spec; read [Body patterns](references/patterns.md) when choosing how to structure body content.
+This skill covers what is specific to skills: how they load, how they trigger, and how to test them. Read skill "agent-instructions" with it, since its principles (earn every token, generalize, remove contradictions, explain why, prefer gotchas, ground in evidence) apply to skills as to any text an agent reads, and this skill does not repeat them. For the harness's own frontmatter fields and file layout, its built-in skill-authoring skill is the reference (skill "create-skill" in Cursor, skill "skill-creator" in Claude Code); where one disagrees with this skill, the gotchas at the end decide. Its Writing workflow, wording rules, and body patterns apply to drafting a skill too. Read [Skill format](references/format.md) when creating a skill or checking frontmatter or naming against the open spec.
 
 ## Why the rules exist
 
@@ -43,9 +43,9 @@ Like a function: one job that composes with other skills. Too narrow forces seve
 
 ### Creating
 
-1. Mine the conversation before asking: purpose and scope, when it should apply, what the agent got wrong or the user corrected, input and output formats, project facts the agent lacked, existing conventions to follow. Interview only for gaps (edge cases, success criteria, dependencies, personal vs. project scope). Preserve user-provided wording when it is valid and unambiguous; otherwise preserve its intent and explain the necessary correction.
+1. Gather as in "Writing" in skill "agent-instructions". For a skill, also settle its dependencies and whether it is personal or project-scoped.
 2. Confirm a skill is the right container ("Where guidance belongs" in skill "agent-instructions"), then choose the lever from the table above, which sets how much the description must do. Converting an existing rule or command keeps its trigger semantics: intelligently-applied rule → auto-invoked skill, slash command → explicit-only. A skill's contents must match what its description leads the user to expect; decline skills whose purpose is deception or unauthorized access.
-3. Draft using [Skill format](references/format.md) and [Body patterns](references/patterns.md), then read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
+3. Draft the body as in "Writing" in skill "agent-instructions" and the frontmatter with [Skill format](references/format.md), layering per the principles above. Then read it cold as in Auditing and run `python3 <skill-dir>/scripts/validate_skill.py <target>`.
 4. Offer testing per Verify with execution and let the user decide: no eval artifacts until they opt in, and cases shown to them before any run. Explain jargon such as "eval" or "assertion" unless the user shows familiarity.
 
 ### Improving
@@ -56,10 +56,9 @@ Like a function: one job that composes with other skills. Too narrow forces seve
 
 ### Auditing
 
-Read as an agent would, cold: description only, then body, then references only where the body sends you. Check each principle here and in skill "agent-instructions", then report in priority order:
+Audit as in skill "agent-instructions" (description first, then body, then references only where the body sends you), check the principles here as well, and add these skill-specific checks to the report:
 
 - Would the description fire on realistic indirect prompts and stay quiet on near-misses that share its keywords?
-- Are there gotchas the skill's history (git log, prior corrections) implies but the skill omits?
 - Do bundled scripts meet [Scripts and commands](references/scripts.md)?
 - Does `python3 <skill-dir>/scripts/validate_skill.py <target>` pass?
 

@@ -5,9 +5,25 @@ description: Write, audit, and improve text whose reader is an agent - subagent 
 
 # Agent instructions
 
-An agent acts on every sentence it reads, cannot ask what you meant, and reads your text beside the task, the conversation, and everything else loaded. The principles below hold for any text written for it; the sections after them cover what differs by kind. For a skill, apply them together with skill "skills-best-practices", which covers skill format, triggering, and evals.
+An agent acts on every sentence it reads, cannot ask what you meant, and reads your text beside the task, the conversation, and everything else loaded. This skill covers writing such text from the start, the principles behind it, what differs by kind, and how to audit and verify it. For a skill, apply them together with skill "skills-best-practices", which covers skill format, triggering, and evals.
 
 File formats, frontmatter fields, and locations belong to each harness, and its built-in authoring skills are the reference for them: in Cursor, skill "create-subagent", skill "create-rule", and skill "create-hook"; in Claude Code, the `/agents` command for subagents and skill "update-config" for hooks. They decide fields and locations; on how to write the text, follow this skill.
+
+## Writing
+
+1. **Gather before drafting.** Mine the conversation first: the purpose and scope, when the text should apply, what the agent got wrong or the user corrected, input and output formats, project facts the agent lacked, and conventions to follow. Ask the user only about gaps such as edge cases and success criteria. Keep the user's own wording where it is valid and unambiguous; otherwise keep its intent and say what you corrected. When there is no record of failures, run the task once with an agent that lacks the text and note where it goes wrong: those failures are what the text must fix.
+2. **Choose the container** from "Where guidance belongs" below, then read the section for that kind.
+3. **Draft for the reader.** Decide what the agent should do differently after reading, and write only toward that. Structure the text by how it will be used, with the shapes in [Body patterns](references/patterns.md): a decision table for routing, a template for output format, examples for style, a checklist for gated steps. Then apply the principles below and the wording rules after this list.
+4. **Read it cold, then run it.** Audit the draft as in "Auditing", then test it as in "Verify".
+
+Wording that agents follow reliably:
+
+- Address the agent in the imperative, and put the condition before the action ("If the migration fails, roll back first") so the agent knows whether a line applies before it acts on it.
+- Say what to do. A bare prohibition names the wrong action and leaves the right one to guess; when a "do not" is needed, give the alternative beside it.
+- Write full sentences outside tables. Fragments and arrow chains drop the "because", "unless", and "only when" that tell the agent how far a rule reaches.
+- Name the exact tool, command, file, or field rather than a category of them.
+- Show a short real example when the target is easier to see than to describe. The agent copies an example's specifics, so use two or three that differ in what should vary.
+- Put what every run needs first and the rare cases last, each behind the condition that calls for it.
 
 ## Principles
 
@@ -37,7 +53,7 @@ The highest-value content is usually concrete corrections to mistakes the agent 
 
 ### Ground in evidence; verify by execution
 
-Write from real runs and artifacts: corrections you made, runbooks, schemas, review comments, fix history, execution transcripts, and for library or API guidance the current documentation rather than memory. Instructions written from general knowledge produce "follow best practices" filler and stale flags. Do not add steps, commands, or rules the source material did not give you: an invented procedure reads as authoritative and is followed as one. Then test with the agent, not by rereading: run realistic tasks with and without the text in fresh contexts, read transcripts for wasted steps and ignored instructions, and remove before adding.
+Write from real runs and artifacts: corrections you made, runbooks, schemas, review comments, fix history, execution transcripts, and for library or API guidance the current documentation rather than memory. Instructions written from general knowledge produce "follow best practices" filler and stale flags. Do not add steps, commands, or rules the source material did not give you: an invented procedure reads as authoritative and is followed as one. Then test with the agent as in "Verify" rather than by rereading, and when fixing what the runs show, remove before adding.
 
 ## Where guidance belongs
 
@@ -70,6 +86,29 @@ A skill loads into the caller's context and shares everything it knows; a subage
 - When you want an independent judgment, send the evidence and not your conclusion or the answer you expect; a brief that carries your view gets your view back.
 - Report failed attempts as what was tried and the error it produced, not the draft that failed, so the recipient does not inherit its approach.
 
+## Auditing
+
+Read the text as its recipient would, cold: what loads first (a description or other routing text), then the body, then linked files only where the body sends you. Check the principles above and report findings in priority order:
+
+- Would the routing text bring the right tasks here and keep near-misses away?
+- Does any line contradict another, or a file that loads beside it (instructions file, rule, skill)?
+- Where would the agent have to guess: an undefined term, an unstated condition, a prohibition with no alternative, a rule with no reason?
+- What would the agent do correctly without the text, or what do the code, configuration, or linters already enforce? Cut it.
+- Which lines patch a single case, and what general rule would replace them?
+- Which mistakes from the text's history (git log, prior corrections) does it still leave uncovered?
+- Do the fields and location match the harness's built-in reference?
+
+Then offer to verify the fixes by execution.
+
 ## Verify
 
-Run the text on a realistic task in a fresh context and compare the result with what you meant. For a subagent, also check that its reply follows the output contract and that the brief its caller sent was enough. For measured comparisons, use the eval method in skill "skills-best-practices".
+Reading cannot show what an agent does with the text, so run it on realistic tasks in fresh contexts, with and without the text or against the previous version, and compare the results with what you meant.
+
+| Kind | How to verify |
+|---|---|
+| Skill | Use the trigger and output evals in skill "skills-best-practices" |
+| Subagent | Give it a realistic brief and check that its reply follows the output contract. Then run tasks in a fresh session where it is available, and check that the caller delegates when it should and that the brief it sends is enough; skill trigger evals do not measure delegation |
+| Instructions file or rule | Run a few ordinary tasks in fresh sessions and read the transcripts for instructions followed, ignored, or misapplied |
+| Brief or prompt | Send it to a fresh agent; anything it asks about or guesses at is missing from the brief |
+
+When results are measured rather than eyeballed, use the eval method and eval-model rule in skill "skills-best-practices"; both carry over to other kinds of text.
