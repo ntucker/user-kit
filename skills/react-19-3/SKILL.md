@@ -300,7 +300,7 @@ Delete pass-through `*Provider` components that existed only for this. The `valu
 
 ## References
 
-- [View Transitions reference](references/view-transitions.md): sequencing, batching, Suspense placement variants, router notes, troubleshooting.
-- [Fragment refs reference](references/fragment-refs.md): every `FragmentInstance` method with signatures, shared-observer and focus patterns.
-- [Browser-only SSR reference](references/browser-ssr.md): `browser()` reference, `onBrowserBailout`, abort, migration recipes.
+- Read [View Transitions reference](references/view-transitions.md) when a transition misbehaves or needs router or Suspense integration: sequencing, batching, Suspense placement variants, router notes, troubleshooting.
+- Read [Fragment refs reference](references/fragment-refs.md) when calling a `FragmentInstance` method beyond the examples here: every `FragmentInstance` method with signatures, shared-observer and focus patterns.
+- Read [Browser-only SSR reference](references/browser-ssr.md) when handling bailouts, aborts, or migrating from mounted flags and `ssr:false`: `browser()` reference, `onBrowserBailout`, abort, migration recipes.
 - Upstream: [React 19.3 post](https://react.dev/blog/2026/09/09/react-19-3), [`<ViewTransition>`](https://react.dev/reference/react/ViewTransition), [`addTransitionType`](https://react.dev/reference/react/addTransitionType), [`<Fragment>`](https://react.dev/reference/react/Fragment), [`browser`](https://react.dev/reference/react-dom/browser), [`<Suspense>`](https://react.dev/reference/react/Suspense).

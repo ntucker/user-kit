@@ -28,6 +28,18 @@
     "should_trigger": true
   },
   {
+    "query": "audit our CLAUDE.md for anything contradictory or out of date before I share the repo with the team",
+    "should_trigger": true
+  },
+  {
+    "query": "the system prompt for our support bot keeps over-apologizing and ignores the refund policy section. tighten it up",
+    "should_trigger": true
+  },
+  {
+    "query": "edit .cursor/agents/planner.md so it stops touching files and just hands back a plan",
+    "should_trigger": true
+  },
+  {
     "query": "write a README for the packages/react folder explaining the hooks",
     "should_trigger": false
   },
@@ -41,6 +53,22 @@
   },
   {
     "query": "the test in src/cache.test.ts started failing after the last merge, find out why and fix it",
+    "should_trigger": false
+  },
+  {
+    "query": "add disable-model-invocation to my deploy skill and fix its frontmatter so validation passes",
+    "should_trigger": false
+  },
+  {
+    "query": "my pdf-tables skill never fires when people ask about invoices, fix its description",
+    "should_trigger": false
+  },
+  {
+    "query": "write the onboarding doc for new engineers explaining how our deploy process works",
+    "should_trigger": false
+  },
+  {
+    "query": "write the PR description for this branch, reviewers mostly care about the migration",
     "should_trigger": false
   }
 ]
