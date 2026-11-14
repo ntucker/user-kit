@@ -13,6 +13,19 @@ Condition → action, branches mutually exclusive, default first, each leaf poin
 | Editing existing content | Follow "Editing" below; read [Edit rules](references/editing.md) first |
 ```
 
+When the factors are checked one after another, a tree in that order, one question per step, so the agent can see which fact to establish next:
+
+```markdown
+- What kind of check failed?
+  - by default → Ask the user
+  - lint → Run the autofix command
+  - test: What caused it?
+    - flaky → Rerun once
+    - regression: Who owns the failing area?
+      - by default → Report to the owner
+      - this PR's author → Fix the code
+```
+
 ## Template (output format)
 
 Agents pattern-match structures better than they follow prose descriptions of format. Inline when short; in a separate file (a skill's `assets/`) when long or only sometimes needed.
