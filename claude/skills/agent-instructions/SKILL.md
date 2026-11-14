@@ -28,7 +28,7 @@ Two instructions that conflict, or only seem to, make the agent pick one arbitra
 
 - Resolve apparent conflicts while writing. Most are true statements about different regimes: name the variable that decides between them and write one conditioned rule instead of both. Check across files too, since an instructions file, a rule, and a skill that load together and disagree are one contradiction.
 - Use one term per concept, and one default with each alternative gated on the case that selects it. State only the current method, never a time-relative instruction ("before August use the old API"); collapse the old method under a deprecated heading.
-- When the action depends on several factors, write a table or tree of condition → action, with mutually exclusive branches, the default first, and each leaf pointing at the step or file that handles it.
+- When the action depends on several factors, write a table or tree of condition → action, with mutually exclusive branches, the default first, and each leaf pointing at the step or file that handles it. When the factors are checked one after another, write a tree in that order with one question per step, not a table with one row per full path: the tree shows which fact to check next, which smaller models work out less reliably from full-path rows, and it takes about half the space.
 - Address the agent in the imperative with the condition first ("If the migration fails, roll back first"), so it knows whether a line applies before it acts on it.
 - Say what to do. When a "do not" is needed, give the alternative beside it.
 - Write full sentences outside tables; fragments and arrow chains drop the "because", "unless", and "only when" that bound a rule.
