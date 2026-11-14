@@ -20,6 +20,7 @@ When the factors are checked one after another, a tree in that order, one questi
   - by default → Ask the user
   - lint → Run the autofix command
   - test: What caused it?
+    - by default → Ask the user
     - flaky → Rerun once
     - regression: Who owns the failing area?
       - by default → Report to the owner
