@@ -54,6 +54,8 @@ Two instructions that conflict, or only seem to, make the agent pick one arbitra
 | As a delegated role with its own context | Subagent |
 | As a deterministic action on an agent event | Hook |
 
+Each line is a copy of a fact whose source is elsewhere. Give it one home, in the layer that changes when its source does: code or a check that enforces it in preference to text that asks, otherwise the narrowest scope where it always holds. Where no such layer exists, point to the source instead of copying it.
+
 A skill loads into the caller's context and shares everything it knows; a subagent starts fresh and returns only its report. Choose a subagent when a clean context, a different model, or restricted tools is the point, and a skill when the work needs the conversation. Text is followed most of the time, not every time: when a rule must hold on every run, enforce it with a hook or a permission rule and keep at most a pointer in the text. Moving content out of an always-applied file changes when it loads: keep what every turn needs, and move the rest into skills or path-scoped rules that say when they apply.
 
 ## By kind
@@ -71,7 +73,7 @@ Whatever decides when text is loaded or delegated to (a description, a rule's gl
 
 ## Auditing
 
-Read the text as its recipient would, cold: the routing text first, then the body, then linked files only where the body sends you. Report as a finding anything the agent would have to guess at (an undefined term, an unstated condition, a prohibition with no alternative, a rule with no reason), a contradiction within the text or with a file that loads beside it, a line that patches a single case, a mistake its history (git log, prior corrections) records that it still leaves open, and anything that fails "What earns a place", whose fix is to cut it. Ask in particular whether the routing text brings realistic, indirect requests here and keeps away near-misses that share its keywords. Put the findings most likely to make the agent act wrongly first, then offer to verify the fixes by execution.
+Read the text as its recipient would, cold: the routing text first, then the body, then linked files only where the body sends you. Report as a finding anything the agent would have to guess at (an undefined term, an unstated condition, a prohibition with no alternative, a rule with no reason), a contradiction within the text or with a file that loads beside it, a line that patches a single case, a line whose source can change without it or that has a better home, a mistake its history (git log, prior corrections) records that it still leaves open, and anything that fails "What earns a place", whose fix is to cut it. Ask in particular whether the routing text brings realistic, indirect requests here and keeps away near-misses that share its keywords. Put the findings most likely to make the agent act wrongly first, then offer to verify the fixes by execution.
 
 ## Verify
 
