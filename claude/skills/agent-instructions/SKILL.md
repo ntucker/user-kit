@@ -54,9 +54,9 @@ Two instructions that conflict, or only seem to, make the agent pick one arbitra
 | As a delegated role with its own context | Subagent |
 | As a deterministic action on an agent event | Hook |
 
-Give each line one container: the one that loads for the fewest tasks while still loading whenever the line applies. An agent discovers text progressively, reading a container only when the harness loads it or text already loaded leads there, so check that every task the line applies to has that path. A copy of a fact owned elsewhere drifts when its owner changes: point to the owner, and copy only what the agent would get wrong by having to look it up.
+Give each line one container: the one that loads for the fewest tasks while still loading for every task the line applies to. Text is discovered progressively, a container read only when the harness loads it or text already loaded leads there, so trace that path for each such task. A copy of a fact owned elsewhere drifts when its owner changes: point to the owner, and copy only what the agent would get wrong by having to look it up.
 
-A skill loads into the caller's context and shares everything it knows; a subagent starts fresh and returns only its report. Choose a subagent when a clean context, a different model, or restricted tools is the point, and a skill when the work needs the conversation. Text is followed most of the time, not every time: when a rule must hold on every run, enforce it with code, a hook, or a permission rule and keep at most a pointer in the text. Moving content out of an always-applied file changes when it loads: keep what every turn needs, and move the rest into skills or path-scoped rules that say when they apply.
+A skill loads into the caller's context and shares everything it knows; a subagent starts fresh and returns only its report. Choose a subagent when a clean context, a different model, or restricted tools is the point, and a skill when the work needs the conversation. Text is followed most of the time, not every time: when a rule must hold on every run, enforce it with code, a hook, or a permission rule and keep at most a pointer in the text.
 
 ## By kind
 
@@ -73,7 +73,7 @@ Whatever decides when text is loaded or delegated to (a description, a rule's gl
 
 ## Auditing
 
-Read the text as its recipient would, cold: the routing text first, then the body, then linked files only where the body sends you. Report as a finding anything the agent would have to guess at (an undefined term, an unstated condition, a prohibition with no alternative, a rule with no reason), a contradiction within the text or with a file that loads beside it, a line that patches a single case, a copy of a fact owned elsewhere that the agent could look up, a line that the tasks it applies to would not load or that loads for tasks it does not apply to, a mistake its history (git log, prior corrections) records that it still leaves open, and anything that fails "What earns a place", whose fix is to cut it. Ask in particular whether the routing text brings realistic, indirect requests here and keeps away near-misses that share its keywords. Put the findings most likely to make the agent act wrongly first, then offer to verify the fixes by execution.
+Read the text as its recipient would, cold: the routing text first, then the body, then linked files only where the body sends you. Report as a finding anything the agent would have to guess at (an undefined term, an unstated condition, a prohibition with no alternative, a rule with no reason), a contradiction within the text or with a file that loads beside it, a line that patches a single case, a line in the wrong container under "Where guidance belongs", a mistake its history (git log, prior corrections) records that it still leaves open, and anything that fails "What earns a place", whose fix is to cut it. Ask in particular whether the routing text brings realistic, indirect requests here and keeps away near-misses that share its keywords. Put the findings most likely to make the agent act wrongly first, then offer to verify the fixes by execution.
 
 ## Verify
 
